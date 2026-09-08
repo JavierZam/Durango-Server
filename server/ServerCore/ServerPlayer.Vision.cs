@@ -83,6 +83,15 @@ public partial class ServerPlayer
         Send(other.MakeAppearPlayer());
         // หน้าตา/อุปกรณ์ที่ใส่อยู่ไม่ได้ติดมากับ AppearPlayer — ไม่ส่งตามจะเห็นเป็นตัวเปล่า
         Send(other.CurrentDisplay);
+        if (other.SpawnedPet != null)
+        {
+            Send(other.MakeAppearPet(other.SpawnedPet));
+            Send(ConvertToPetMessage(other.SpawnedPet));
+            if (other.SpawnedPet.IsBoarding)
+            {
+                Send(other.CurrentDisplay);
+            }
+        }
     }
 
     /// <summary>เริ่มเห็นสัตว์ตัวนี้</summary>

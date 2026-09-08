@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Durango.Utils;
 using Messages;
@@ -1280,7 +1280,7 @@ public sealed partial class AnimalSpawner
             }
         }
         ServerPlayer prey = _world.FindNearestPlayer(a.PositionAt(now), SightRange);
-        if (prey == null || prey.Dead)
+        if (prey == null || prey.Dead || prey.IsPeaceful)
         {
             return;
         }
@@ -1302,6 +1302,11 @@ public sealed partial class AnimalSpawner
     private void OnAttacked(ServerAnimal animal, string attackerId, double now)
     {
         if (string.IsNullOrEmpty(attackerId))
+        {
+            return;
+        }
+        ServerPlayer attacker = _world.FindPlayer(attackerId);
+        if (attacker != null && attacker.IsPeaceful)
         {
             return;
         }
@@ -1477,6 +1482,14 @@ public sealed partial class AnimalSpawner
         lock (_lock)
         {
             _targets.Remove(animalId);
+        }
+    }
+
+    public void ClearAllTargets()
+    {
+        lock (_lock)
+        {
+            _targets.Clear();
         }
     }
 

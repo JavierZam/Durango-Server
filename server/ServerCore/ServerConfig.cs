@@ -933,7 +933,7 @@ public sealed class FeatureConfig
             Cooking = true,             // เปิดแล้ว — สูตร cook 152 อัน ต้องยืนที่กองไฟ/เตาถึงจะทำได้
             Farming = true,
             Livestock = false,
-            Taming = false,
+            Taming = true,
             Market = false,
             WarpAccelerator = false,   // ยังไม่เคยเทสในเกมจริง — เปิดเองตอนพร้อม
             Quests = true,

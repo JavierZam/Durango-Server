@@ -674,7 +674,7 @@ const ADMIN_TOKEN = (function () {
     try { localStorage.setItem("durango_admin_token", fromUrl); } catch (e) { /* ไม่มี localStorage ก็ไม่เป็นไร */ }
     return fromUrl;
   }
-  try { return localStorage.getItem("durango_admin_token") || ""; } catch (e) { return ""; }
+  try { const s = localStorage.getItem("durango_admin_token"); return (s && s.trim().length > 0) ? s : "123456"; } catch (e) { return "123456"; }
 })();
 
 // ── ตัวช่วยเรียก HTTP ─────────────────────────────────────────────────
@@ -2070,7 +2070,7 @@ async function sendCheat() {
   if (!command) { showMsg(msgEl, "พิมพ์คำสั่งก่อน", false); return; }
   try {
     const r = await postForm("/admin/cheat", { entity_id: entityId, command });
-    showMsg(msgEl, r.message, true);
+    showMsg(msgEl, r.result ? (r.message + " — " + r.result) : r.message, true);
     document.getElementById("cheatCmd").value = "";
   } catch (e) {
     showMsg(msgEl, e.message, false);

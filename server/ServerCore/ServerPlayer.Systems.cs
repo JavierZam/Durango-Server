@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Durango.Network;
 using Durango.Utils;
@@ -146,6 +146,10 @@ public partial class ServerPlayer
     private void RegisterPetHandlers()
     {
         _conn.Recv<GetPetsInfo>(HandleGetPetsInfo);
+        _conn.Recv<SpawnPet>(HandleSpawnPet);
+        _conn.Recv<ReturnPet>(HandleReturnPet);
+        _conn.Recv<Mount>(HandleMount);
+        _conn.Recv<Unmount>(HandleUnmount);
         _conn.Recv<GetPreviewPet>(HandleGetPreviewPet);
         _conn.Recv<StartDomestication>(HandleStartDomestication);
         _conn.Recv<FinishDomestication>(HandleFinishDomestication);
@@ -159,16 +163,6 @@ public partial class ServerPlayer
         _conn.Recv<GetAvailableTask>(HandleGetAvailableTask);
         _conn.Recv<GetMilestoneCandidate>(HandleGetMilestoneCandidate);
         _conn.Recv<AcceptMilestone>(HandleAcceptMilestone);
-    }
-
-    private void HandleGetPetsInfo(GetPetsInfo msg, PacketHeader header)
-    {
-        Send(new PetsInfo
-        {
-            Pets = default,
-            GrazedPets = default,
-            GrazableCount = 0
-        }, header.Seq);
     }
 
     private void HandleGetPreviewPet(GetPreviewPet msg, PacketHeader header)
@@ -201,12 +195,6 @@ public partial class ServerPlayer
         Send(new Info { Text = "คำสั่งนี้ยังไม่รองรับบนเซิร์ฟนี้" }, header.Seq);
     }
 
-    private void HandleUseTamingAction(UseTamingAction msg, PacketHeader header)
-    {
-        if (!ServerConfig.Current.Features.Taming) { RejectTamingDisabled(header); return; }
-        Send(new Info { Text = "คำสั่งนี้ยังไม่รองรับบนเซิร์ฟนี้" }, header.Seq);
-    }
-
     private void HandlePutInCage(PutInCage msg, PacketHeader header)
     {
         if (!ServerConfig.Current.Features.Taming) { RejectTamingDisabled(header); return; }
@@ -223,18 +211,6 @@ public partial class ServerPlayer
     {
         Send(new Info { Text = "ระบบปศุสัตว์ยังไม่เปิดใช้งาน" }, header.Seq);
         return false;
-    }
-
-    private void HandleRenamePet(RenamePet msg, PacketHeader header)
-    {
-        if (!ServerConfig.Current.Features.Taming) { RejectTamingDisabled(header); return; }
-        Send(new Info { Text = "คำสั่งนี้ยังไม่รองรับบนเซิร์ฟนี้" }, header.Seq);
-    }
-
-    private void HandleReleasePet(ReleasePet msg, PacketHeader header)
-    {
-        if (!ServerConfig.Current.Features.Taming) { RejectTamingDisabled(header); return; }
-        Send(new Info { Text = "คำสั่งนี้ยังไม่รองรับบนเซิร์ฟนี้" }, header.Seq);
     }
 
     private void HandleGrazePets(GrazePets msg, PacketHeader header)

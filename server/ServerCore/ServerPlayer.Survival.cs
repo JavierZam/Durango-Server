@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Durango.Network;
 using Durango.Utils;
@@ -510,9 +510,16 @@ public partial class ServerPlayer
         PushGauges("fatigue", "stamina");
     }
 
+    public bool IsPeaceful { get; set; }
+    public bool IsInvincible { get; set; }
+
     /// <summary>ลดเลือด คืน true ถ้าตาย — สกิลหมวดป้องกันช่วยลดดาเมจที่รับ</summary>
     public bool ApplyDamage(float amount)
     {
+        if (IsInvincible)
+        {
+            return false;
+        }
         EnsureSurvival();
         // สกิลหมวดป้องกัน × เกราะที่ใส่จริง
         // 🐛 เดิมมีแต่สกิล ⇒ ใส่ชุดเกราะเต็มยศก็เจ็บเท่าเดิมเป๊ะ (เกราะเป็นแค่เครื่องแต่งกาย)

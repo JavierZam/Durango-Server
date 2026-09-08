@@ -103,6 +103,11 @@
     "BackupDir": "",
     "BackupOnStartup": true
   },
+  "Announcement": {
+    "Text": "",
+    "RepeatSeconds": 0.0
+  },
+  "AssetBundleUrlBase": "",
   "CraftMenu": {
     "HiddenCategories": [
       "deco_and_installation",
@@ -364,7 +369,7 @@
     "Cooking": true,
     "Farming": true,
     "Livestock": false,
-    "Taming": false,
+    "Taming": true,
     "Market": false,
     "WarpAccelerator": false,
     "Quests": true,
@@ -559,8 +564,8 @@
     "AlwaysResendChunks": true
   },
   "PlayerIds": {
-    "Enabled": true,
-    "Required": true,
+    "Enabled": false,
+    "Required": false,
     "BindingDays": 30,
     "PublicUrl": ""
   },

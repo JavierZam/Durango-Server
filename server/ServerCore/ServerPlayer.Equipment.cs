@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Durango.Network;
+using Durango.Utils;
 using Messages;
+using Shared.Display;
 using Shared.Item;
 
 namespace DurangoServer.Core;
@@ -154,7 +156,20 @@ public partial class ServerPlayer
             {
                 RebuildEquipments();
             }
-            return _display;
+            PlayerDisplay d = _display;
+            if (_spawnedPet != null && _spawnedPet.IsBoarding)
+            {
+                d.BoardingOn = BoardingOn.Pet;
+                d.VehicleEntityId = _spawnedPet.EntityId;
+                d.BoardingTime = new TimeRange { Since = Times.UnixTimeNow(), Until = null };
+            }
+            else
+            {
+                d.BoardingOn = BoardingOn.None;
+                d.VehicleEntityId = string.Empty;
+                d.BoardingTime = default;
+            }
+            return d;
         }
     }
 

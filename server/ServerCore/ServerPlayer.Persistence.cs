@@ -231,6 +231,7 @@ public partial class ServerPlayer
         ApplyMailSave(save);
         ApplyWalletSave(save);
         ApplyClanSave(save);
+        ApplyPetSave(save);
 
         _starterGiven = save.StarterGiven;
         if (!_starterGiven)
@@ -332,6 +333,7 @@ public partial class ServerPlayer
         FillMailSave(save);
         FillWalletSave(save);
         FillClanSave(save);
+        FillPetSave(save);
         for (int i = 0; i < _knownSkills.Count; i++)
         {
             save.KnownSkills.Add(SkillBundleSave.From(_knownSkills[i]));

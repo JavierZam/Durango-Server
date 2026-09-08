@@ -145,6 +145,16 @@ public partial class ServerPlayer
         SendDefoggedChunks();
         SendQuestCategories();
         SendQuestsOnSpawn();
+        SendPetsInfo();
+        if (_spawnedPet != null)
+        {
+            Send(MakeAppearPet(_spawnedPet));
+            Send(ConvertToPetMessage(_spawnedPet));
+            if (_spawnedPet.IsBoarding)
+            {
+                Send(CurrentDisplay);
+            }
+        }
         Send(new WalletUpdated
         {
             EntityId = EntityId,
@@ -162,6 +172,16 @@ public partial class ServerPlayer
             SendStatistics();
             SendSurvival();
             SendSkills();
+            SendPetsInfo();
+            if (_spawnedPet != null)
+            {
+                Send(MakeAppearPet(_spawnedPet));
+                Send(ConvertToPetMessage(_spawnedPet));
+                if (_spawnedPet.IsBoarding)
+                {
+                    Send(CurrentDisplay);
+                }
+            }
         }));
     }
 

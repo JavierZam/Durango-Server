@@ -65,6 +65,9 @@ public static class GameData
         // 4) tag + ชื่อไอเทม (prototype_data.json)
         LoadItemData(Path.Combine(assetsDir, "item", "prototype_data.json"));
 
+        // 4.5) ข้อมูลสัตว์เลี้ยงและเทมเพลตสำหรับ taming (pets_for_client.json)
+        PetData.Load(Path.Combine(assetsDir, "pet", "pets_for_client.json"));
+
         // 5) manifest ของทุกไฟล์ที่เสิร์ฟ
         BuildManifest(assetsDir);
     }

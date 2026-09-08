@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -637,6 +637,12 @@ public partial class ServerPlayer
         });
         _conn.Recv<SayInExclusiveChannel>(delegate(SayInExclusiveChannel msg, PacketHeader header)
         {
+            string chatText = ChatBody.ReadText(msg.Message.Body);
+            if (!string.IsNullOrWhiteSpace(chatText) && chatText.StartsWith("/"))
+            {
+                RunAdminCheat(chatText);
+                return;
+            }
             if (!AcceptChat(ref msg.Message))
             {
                 return;
@@ -651,6 +657,12 @@ public partial class ServerPlayer
         });
         _conn.Recv<SayInConversation>(delegate(SayInConversation msg, PacketHeader header)
         {
+            string chatText = ChatBody.ReadText(msg.Message.Body);
+            if (!string.IsNullOrWhiteSpace(chatText) && chatText.StartsWith("/"))
+            {
+                RunAdminCheat(chatText);
+                return;
+            }
             if (!AcceptChat(ref msg.Message))
             {
                 return;

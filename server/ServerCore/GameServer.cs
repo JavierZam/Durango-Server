@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -251,6 +251,7 @@ public class GameServer
 
     private readonly Listener _listener = new Listener();
     private readonly ServerWorld _world;
+    public ServerWorld World => _world;
     private readonly Dictionary<string, string> _namesByEntity = new Dictionary<string, string>();
     private readonly List<ConnState> _connections = new List<ConnState>();
     private readonly object _connLock = new object();

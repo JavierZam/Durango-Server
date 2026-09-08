@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -19,6 +19,7 @@ using Shared.Skill;
 using Shared.Social;
 using Shared.Building;
 using Shared.Etc;
+using Shared.Animal;
 
 namespace DurangoServer.Core;
 
@@ -48,16 +49,115 @@ public partial class ServerPlayer
         HandleCheat(new Cheat { _Cheat = rawCommand ?? "" }, default);
     }
 
+    private static readonly Dictionary<string, ushort[]> DinoPacks = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { "apex", new ushort[] { 2005, 2021, 2086, 2082 } },
+        { "carnivores", new ushort[] { 2005, 2021, 2086, 2082 } },
+        { "carnivore", new ushort[] { 2005, 2021, 2086, 2082 } },
+
+        { "raptors", new ushort[] { 2001, 2002, 2023, 2029, 2024 } },
+        { "raptor", new ushort[] { 2001, 2002, 2023, 2029, 2024 } },
+
+        { "ceratops", new ushort[] { 2003, 2019, 2027, 2041, 2017 } },
+        { "ceratopsians", new ushort[] { 2003, 2019, 2027, 2041, 2017 } },
+        { "tricera", new ushort[] { 2003, 2019, 2027, 2041, 2017 } },
+
+        { "sauropods", new ushort[] { 2004, 2133, 2179 } },
+        { "sauropod", new ushort[] { 2004, 2133, 2179 } },
+        { "brachio", new ushort[] { 2004, 2133, 2179 } },
+
+        { "armored", new ushort[] { 2000, 2010, 2011, 2083, 2054 } },
+        { "stego", new ushort[] { 2000, 2010, 2011, 2083, 2054 } },
+        { "ankylo", new ushort[] { 2000, 2010, 2011, 2083, 2054 } },
+
+        { "mammals", new ushort[] { 2008, 2007, 2020, 2013, 2012 } },
+        { "mammal", new ushort[] { 2008, 2007, 2020, 2013, 2012 } },
+        { "mammoth", new ushort[] { 2008, 2007, 2020, 2013, 2012 } },
+
+        { "hadrosaurs", new ushort[] { 2009, 2048, 2030, 2177 } },
+        { "hadrosaur", new ushort[] { 2009, 2048, 2030, 2177 } },
+        { "parasau", new ushort[] { 2009, 2048, 2030, 2177 } },
+
+        { "small", new ushort[] { 2015, 2025, 2022, 2034, 2033 } },
+        { "compso", new ushort[] { 2015, 2025, 2022, 2034, 2033 } },
+
+        { "bosses", new ushort[] { 2114, 2110, 2098, 2112, 2124, 2109 } },
+        { "alpha", new ushort[] { 2114, 2110, 2098, 2112, 2124, 2109 } },
+        { "boss", new ushort[] { 2114, 2110, 2098, 2112, 2124, 2109 } },
+
+        { "events", new ushort[] { 2053, 2050, 2049, 2156, 2182, 2131 } },
+        { "costumes", new ushort[] { 2053, 2050, 2049, 2156, 2182, 2131 } },
+    };
+
+    private static readonly Dictionary<string, ushort> DinoNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { "trex", 2005 },
+        { "t-rex", 2005 },
+        { "tyrannosaurus", 2005 },
+        { "alphatrex", 2114 },
+        { "alpha_trex", 2114 },
+        { "allosaurus", 2021 },
+        { "tarbosaurus", 2086 },
+        { "ceratosaurus", 2082 },
+        { "oviraptor", 2002 },
+        { "utahraptor", 2023 },
+        { "deinonychus", 2029 },
+        { "dilophosaurus", 2024 },
+        { "coelophysis", 2016 },
+        { "triceratops", 2003 },
+        { "zebraceratops", 2027 },
+        { "styracosaurus", 2019 },
+        { "centrosaurus", 2041 },
+        { "chasmosaurus", 2018 },
+        { "protoceratops", 2017 },
+        { "brachiosaurus", 2004 },
+        { "apatosaurus", 2133 },
+        { "amargasaurus", 2179 },
+        { "stegosaurus", 2000 },
+        { "ankylosaurus", 2010 },
+        { "euoplocephalus", 2011 },
+        { "kentrosaurus", 2083 },
+        { "sabertooth", 2007 },
+        { "smilodon", 2007 },
+        { "direwolf", 2020 },
+        { "wolf", 2020 },
+        { "megaloceros", 2013 },
+        { "macrauchenia", 2012 },
+        { "parasaurolophus", 2009 },
+        { "iguanodon", 2048 },
+        { "corythosaurus", 2030 },
+        { "compsognathus", 2015 },
+        { "gallimimus", 2025 },
+        { "pachycephalosaurus", 2022 },
+        { "pachy", 2022 },
+        { "dimetrodon", 2034 },
+        { "dodo", 2033 },
+        { "labrador", 2131 },
+        { "dog", 2131 },
+    };
+
+    private void SendCheatReply(string text, PacketHeader header = default)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        Send(new Info { Text = text }, header.Seq);
+        SendNotice(text, "Cheat");
+        SendSystemChat(text, "Cheat");
+    }
+
     private void HandleCheat(Cheat msg, PacketHeader header)
     {
         string raw = (msg._Cheat ?? "").Trim();
+        if (raw.StartsWith("/"))
+        {
+            raw = raw.Substring(1).TrimStart();
+        }
         string cmd = raw.ToLower();
 
         // H-2: ปิดคำสั่งทดสอบเป็นค่าเริ่มต้น — เดิมใครก็เสกของ/ฟื้นเลือด/เรียกสัตว์/ลากตัวคนอื่นได้
         if (!GameServer.CheatsEnabled)
         {
             Console.WriteLine($"[cheat] ปฏิเสธ {Name} ({EntityId}): '{cmd}' — คำสั่งทดสอบถูกปิดอยู่");
-            Send(new Info { Text = "คำสั่งทดสอบถูกปิดอยู่ (เปิดเซิร์ฟด้วย --enable-cheat ถึงจะใช้ได้)" }, header.Seq);
+            SendCheatReply("คำสั่งทดสอบถูกปิดอยู่ (เปิดเซิร์ฟด้วย --enable-cheat ถึงจะใช้ได้)", header);
             return;
         }
         Console.WriteLine($"[cheat] {EntityId}: {cmd}");
@@ -70,19 +170,40 @@ public partial class ServerPlayer
             return;
         }
 
-        // spawn [ชนิด]                     — เกิดตรงที่ยืนอยู่ (ชนิด 2000-2999, ไม่ใส่ = สุ่ม)
+        // spawn [ชนิด/ชื่อ/หมวด]            — เกิดตรงที่ยืนอยู่ (ชนิด 2000-2999, ไม่ใส่ = สุ่ม)
         // spawn <tileX> <tileY> [ความสูง]  — เกิดที่พิกัดที่ระบุ
         if (cmd.StartsWith("spawn ", StringComparison.Ordinal))
         {
             string[] sp = cmd.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (sp.Length == 2 && ushort.TryParse(sp[1], out ushort wantType) && wantType >= 2000)
+            if (sp.Length == 2)
             {
-                ServerAnimal one = _world.Animals.SpawnAt(CurrentPosition, wantType, CurrentHeight);
-                string known = AnimalData.TryGet(wantType, out AnimalData.AnimalInfo ai) ? ai.ModelPath : "(ไม่รู้จักชนิดนี้)";
-                // แนบ entity id มาด้วย — เทสจะได้ยิงใส่ "ตัวที่เพิ่งเสก" ได้แน่นอน ไม่ต้องเดาจาก AppearAnimal
-                // (พอมีระบบระยะมองเห็น สัตว์เดินเข้า/ออกจอตลอด ตัวที่ appear ล่าสุดมักไม่ใช่ตัวที่เสก)
-                Send(new Info { Text = $"เกิดสัตว์ type {one.EntityType} lv{one.Level} ข้างตัว [id={one.EntityId}] — โมเดล {known}" }, header.Seq);
-                return;
+                if (ushort.TryParse(sp[1], out ushort wantType) && wantType >= 2000)
+                {
+                    ServerAnimal one = _world.Animals.SpawnAt(CurrentPosition, wantType, CurrentHeight);
+                    string known = AnimalData.TryGet(wantType, out AnimalData.AnimalInfo ai) ? ai.ModelPath : "(tidak dikenal)";
+                    SendCheatReply($"Muncul hewan type {one.EntityType} lv{one.Level} [id={one.EntityId}] — Model: {known}", header);
+                    return;
+                }
+                if (DinoPacks.TryGetValue(sp[1], out ushort[] pack))
+                {
+                    WorldPosition basePos = CurrentPosition;
+                    float radius = 250f;
+                    for (int i = 0; i < pack.Length; i++)
+                    {
+                        float angle = (float)(i * (2.0 * Math.PI / pack.Length));
+                        WorldPosition spawnPos = new WorldPosition(basePos.x + MathF.Cos(angle) * radius, basePos.y + MathF.Sin(angle) * radius);
+                        _world.Animals.SpawnAt(spawnPos, pack[i], CurrentHeight);
+                    }
+                    SendCheatReply($"Muncul 1 paket dinosaurus '{sp[1]}' ({pack.Length} ekor) melingkari posisimu!", header);
+                    return;
+                }
+                if (DinoNames.TryGetValue(sp[1], out ushort namedType))
+                {
+                    ServerAnimal one = _world.Animals.SpawnAt(CurrentPosition, namedType, CurrentHeight);
+                    string known = AnimalData.TryGet(namedType, out AnimalData.AnimalInfo ai) ? ai.ModelPath : sp[1];
+                    SendCheatReply($"Muncul {sp[1]} (type {one.EntityType} lv{one.Level}) di sampingmu! — Model: {known}", header);
+                    return;
+                }
             }
             if (sp.Length >= 3 && int.TryParse(sp[1], out int sx) && int.TryParse(sp[2], out int sy))
             {
@@ -92,9 +213,196 @@ public partial class ServerPlayer
                     height = h;
                 }
                 ServerAnimal at = _world.Animals.SpawnAt(new WorldPosition(sx * 200f + 100f, sy * 200f + 100f), 0, height);
-                Send(new Info { Text = $"เกิดสัตว์ type {at.EntityType} lv{at.Level} ที่ tile {sx},{sy} ความสูง {height:F0}" }, header.Seq);
+                SendCheatReply($"เกิดสัตว์ type {at.EntityType} lv{at.Level} ที่ tile {sx},{sy} ความสูง {height:F0}", header);
                 return;
             }
+        }
+
+        // tame — จับไดโนเสาร์ตัวที่อยู่ใกล้ที่สุดในระยะ 25 tile
+        if (cmd.Equals("tame", StringComparison.Ordinal) || cmd.StartsWith("tame ", StringComparison.Ordinal))
+        {
+            ServerAnimal nearest = null;
+            float minDistanceSq = 25f * 25f * 200f * 200f;
+            foreach (var a in _world.Animals.Snapshot())
+            {
+                if (a != null && a.IsAlive)
+                {
+                    float dSq = DistanceSqTo(a.Position);
+                    if (dSq < minDistanceSq)
+                    {
+                        minDistanceSq = dSq;
+                        nearest = a;
+                    }
+                }
+            }
+
+            if (nearest == null)
+            {
+                SendCheatReply("Tidak ada dinosaurus dalam jarak 25 tile untuk di-tame.", header);
+                return;
+            }
+
+            TameAnimal(nearest);
+            SendCheatReply($"Berhasil menjinakkan dinosaurus type {nearest.EntityType} (Lv.{nearest.Level})!", header);
+            return;
+        }
+
+        // pet <list | spawn | return | add>
+        if (cmd.StartsWith("pet", StringComparison.Ordinal))
+        {
+            string[] parts = raw.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            string sub = parts.Length > 1 ? parts[1].ToLowerInvariant() : "list";
+
+            if (sub == "list")
+            {
+                if (_pets.Count == 0)
+                {
+                    SendCheatReply("Kamu belum memiliki pet apapun. Gunakan /tame atau /pet add <nama/id>.", header);
+                    return;
+                }
+
+                var sb = new StringBuilder("Daftar Pet Kamu:\n");
+                for (int i = 0; i < _pets.Count; i++)
+                {
+                    var p = _pets[i];
+                    string status = p.IsSpawned ? (p.IsBoarding ? "[Ditunggangi]" : "[Aktif]") : "[Istirahat]";
+                    sb.AppendLine($"{i + 1}. {p.Name} (Lv.{p.Level} Rank {((PetRank)p.Rank)}) {status} - ID: {p.EntityId}");
+                }
+                SendCheatReply(sb.ToString().TrimEnd(), header);
+                return;
+            }
+
+            if (sub == "spawn")
+            {
+                if (parts.Length < 3)
+                {
+                    if (_pets.Count > 0)
+                    {
+                        SpawnPetInternal(_pets[0]);
+                        SendCheatReply($"Memanggil {_pets[0].Name}!", header);
+                    }
+                    else
+                    {
+                        SendCheatReply("Gunakan: /pet spawn <nama/nomor/id>", header);
+                    }
+                    return;
+                }
+
+                string target = parts[2];
+                PetSave found = null;
+                if (int.TryParse(target, out int idx) && idx >= 1 && idx <= _pets.Count)
+                {
+                    found = _pets[idx - 1];
+                }
+                else
+                {
+                    found = _pets.FirstOrDefault(p =>
+                        string.Equals(p.EntityId, target, StringComparison.OrdinalIgnoreCase) ||
+                        p.Name.Contains(target, StringComparison.OrdinalIgnoreCase) ||
+                        (PetData.FindByEntityType(p.EntityType) is PetTemplate tpl && (
+                            tpl.Species.Contains(target, StringComparison.OrdinalIgnoreCase) ||
+                            tpl.TypeName.Contains(target, StringComparison.OrdinalIgnoreCase) ||
+                            tpl.Name.Contains(target, StringComparison.OrdinalIgnoreCase))));
+                }
+
+                if (found == null)
+                {
+                    SendCheatReply($"Pet '{target}' tidak ditemukan.", header);
+                    return;
+                }
+
+                SpawnPetInternal(found);
+                SendCheatReply($"Memanggil {found.Name}!", header);
+                return;
+            }
+
+            if (sub == "return" || sub == "dismiss" || sub == "despawn")
+            {
+                if (_spawnedPet == null)
+                {
+                    SendCheatReply("Tidak ada pet yang sedang aktif/dipanggil.", header);
+                    return;
+                }
+
+                string pName = _spawnedPet.Name;
+                ReturnPetInternal(_spawnedPet);
+                SendCheatReply($"Pet {pName} telah dikembalikan/istirahat.", header);
+                return;
+            }
+
+            if (sub == "add")
+            {
+                if (parts.Length < 3)
+                {
+                    SendCheatReply("Gunakan: /pet add <spesies/id> [level] (contoh: /pet add trex, /pet add raptor 60)", header);
+                    return;
+                }
+
+                string query = parts[2];
+                int level = 1;
+                if (parts.Length >= 4 && int.TryParse(parts[3], out int lv))
+                {
+                    level = Math.Clamp(lv, 1, 60);
+                }
+
+                PetTemplate tmpl = PetData.FindByQuery(query);
+                ushort entityType = tmpl?.EntityType ?? (ushort.TryParse(query, out ushort qid) ? qid : (ushort)3001);
+                string petName = tmpl?.Name ?? query;
+                var created = AddPetDirect(entityType, petName, level);
+                SendCheatReply($"Berhasil menambahkan pet {created.Name} (Lv.{created.Level})!", header);
+                return;
+            }
+
+            if (sub == "mount" || sub == "ride")
+            {
+                if (_spawnedPet == null)
+                {
+                    SendCheatReply("Tidak ada pet yang aktif. Panggil pet dulu dengan /pet spawn.", header);
+                    return;
+                }
+                MountPetInternal();
+                SendCheatReply($"Menaiki pet {_spawnedPet.Name}!", header);
+                return;
+            }
+
+            if (sub == "unmount" || sub == "dismount")
+            {
+                if (_spawnedPet == null || !_spawnedPet.IsBoarding)
+                {
+                    SendCheatReply("Kamu sedang tidak menaiki pet.", header);
+                    return;
+                }
+                UnmountPetInternal();
+                SendCheatReply($"Turun dari pet {_spawnedPet.Name}.", header);
+                return;
+            }
+
+            SendCheatReply("Perintah pet: /pet list, /pet spawn <nama/nomor>, /pet return, /pet add <spesies> [level], /pet mount, /pet unmount", header);
+            return;
+        }
+
+        if (cmd.Equals("mount", StringComparison.Ordinal) || cmd.Equals("ride", StringComparison.Ordinal))
+        {
+            if (_spawnedPet == null)
+            {
+                SendCheatReply("Tidak ada pet yang aktif. Panggil pet dulu dengan /pet spawn.", header);
+                return;
+            }
+            MountPetInternal();
+            SendCheatReply($"Menaiki pet {_spawnedPet.Name}!", header);
+            return;
+        }
+
+        if (cmd.Equals("unmount", StringComparison.Ordinal) || cmd.Equals("dismount", StringComparison.Ordinal))
+        {
+            if (_spawnedPet == null || !_spawnedPet.IsBoarding)
+            {
+                SendCheatReply("Kamu sedang tidak menaiki pet.", header);
+                return;
+            }
+            UnmountPetInternal();
+            SendCheatReply($"Turun dari pet {_spawnedPet.Name}.", header);
+            return;
         }
 
         // give <prototype> [จำนวน] — เสกไอเทมอะไรก็ได้ที่มีอยู่ในเกม (ชื่อ/ไอคอน/tag มาจากข้อมูลจริง)
@@ -305,6 +613,7 @@ public partial class ServerPlayer
                 SendStatistics();
                 break;
             case "heal":
+            case "revive":
                 // ฟื้นเต็ม + ล้างความล้า — ไว้ตั้งต้นบอทเทสให้สภาพเหมือนกันทุกรอบ
                 //
                 // 🐛 ที่ต้องมี: บอทเทสใช้ **ไฟล์เซฟเดิมทุกรอบ** (id คงที่อย่าง gp-check-1)
@@ -316,6 +625,23 @@ public partial class ServerPlayer
                     ReviveAtSpawn();
                 }
                 Send(new Info { Text = "ฟื้นเต็ม เลือด/สตามินาเต็ม ความล้าเป็น 0" }, header.Seq);
+                break;
+            case "peace":
+            case "peaceful":
+            case "passive":
+            case "noaggro":
+                IsPeaceful = !IsPeaceful;
+                if (IsPeaceful)
+                {
+                    _world.Animals.ClearAllTargets();
+                }
+                Send(new Info { Text = IsPeaceful ? "Mode Damai AKTIF (Peace): Dinosaurus tidak akan melihat, mengejar, atau menyerangmu!" : "Mode Damai NONAKTIF: Dinosaurus normal kembali." }, header.Seq);
+                break;
+            case "god":
+            case "inv":
+            case "invincible":
+                IsInvincible = !IsInvincible;
+                Send(new Info { Text = IsInvincible ? "Mode Kebal AKTIF (God Mode): Kamu kebal terhadap semua serangan & damage!" : "Mode Kebal NONAKTIF: Darah berkurang normal." }, header.Seq);
                 break;
             case "checklist":
                 Send(new Info { Text = DescribeChecklist() }, header.Seq);

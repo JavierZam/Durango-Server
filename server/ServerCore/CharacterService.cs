@@ -36,9 +36,10 @@ public sealed class CharacterService
         string remoteIp = request?.RemoteEndPoint?.Address?.ToString() ?? "?";
         List<AccountStore.Account> accounts = ResolveAccounts(remoteIp, ownerKey);
         JArray players = new JArray();
+        int slotLimit = Math.Max(PlayerSlotCount, Math.Min(accounts.Count, MaxPlayerSlotCount));
         foreach (AccountStore.Account account in accounts)
         {
-            if (players.Count >= PlayerSlotCount)
+            if (players.Count >= slotLimit)
             {
                 break;
             }
@@ -61,7 +62,7 @@ public sealed class CharacterService
         {
             ["players"] = players,
             ["max_player_slot_count"] = MaxPlayerSlotCount,
-            ["player_slot_count"] = PlayerSlotCount
+            ["player_slot_count"] = Math.Max(PlayerSlotCount, players.Count)
         }.ToString());
     }
 
@@ -258,7 +259,12 @@ public sealed class CharacterService
         //
         // แก้ให้จองบัญชีตั้งแต่ตอนสร้าง — จุดที่รู้แน่นอนว่าใครเป็นเจ้าของ id นี้
         string createIp = request?.RemoteEndPoint?.Address?.ToString() ?? "?";
-        if (!AccountStore.TryClaim(entityId, name, createIp, postData.Get("account_id"), out string claimDenied))
+        string accountOwner = postData.Get("account_id");
+        if (string.IsNullOrEmpty(accountOwner))
+        {
+            accountOwner = AccountStore.GetLatestOwnerForIp(createIp);
+        }
+        if (!AccountStore.TryClaim(entityId, name, createIp, accountOwner, out string claimDenied))
         {
             Console.WriteLine($"[account] ผูกบัญชีให้ตัวละครใหม่ {entityId} ไม่สำเร็จ: {claimDenied}");
         }

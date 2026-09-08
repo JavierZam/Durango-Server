@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -66,7 +66,7 @@ public static class Program
         int gatewayPort = Gateway.DefaultPort;
         string assetBundleDir = null;
         bool insecureAuth = false;
-        bool enableRadiotower = false;      // GP-12
+        bool enableRadiotower = true;      // GP-12
         int radiotowerPort = 0;             // 0 = ยังไม่ระบุ ⇒ ใช้ gamePort + 1 (ค่าเดิม 8191+1 = 8192)
         string publicHost = null;
         string islandId = null;         // Beta 1.1: โหมดหลายเกาะ

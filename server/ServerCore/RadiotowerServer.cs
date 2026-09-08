@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using Durango.Network;
@@ -112,16 +112,34 @@ public class RadiotowerServer
         });
         connection.Recv<SayInExclusiveChannel>(delegate(SayInExclusiveChannel msg, PacketHeader header)
         {
+            string chatText = ChatBody.ReadText(msg.Message.Body);
+            if (!string.IsNullOrWhiteSpace(chatText) && chatText.StartsWith("/"))
+            {
+                if (_gameServer?.World?.FindPlayer(client.EntityId) is ServerPlayer p)
+                {
+                    p.RunAdminCheat(chatText);
+                }
+                return;
+            }
             if (!AcceptChat(client, ref msg.Message)) return;
             msg.Message = StampSpeaker(client, msg.Message);
-            Console.WriteLine("[chat] {0}: {1}", client.Name, ChatBody.ReadText(msg.Message.Body) ?? "(ไม่ใช่ข้อความ)");
+            Console.WriteLine("[chat] {0}: {1}", client.Name, chatText ?? "(ไม่ใช่ข้อความ)");
             Broadcast(msg);
         });
         connection.Recv<SayInConversation>(delegate(SayInConversation msg, PacketHeader header)
         {
+            string chatText = ChatBody.ReadText(msg.Message.Body);
+            if (!string.IsNullOrWhiteSpace(chatText) && chatText.StartsWith("/"))
+            {
+                if (_gameServer?.World?.FindPlayer(client.EntityId) is ServerPlayer p)
+                {
+                    p.RunAdminCheat(chatText);
+                }
+                return;
+            }
             if (!AcceptChat(client, ref msg.Message)) return;
             msg.Message = StampSpeaker(client, msg.Message);
-            Console.WriteLine("[chat-conv] {0}: {1}", client.Name, ChatBody.ReadText(msg.Message.Body) ?? "(ไม่ใช่ข้อความ)");
+            Console.WriteLine("[chat-conv] {0}: {1}", client.Name, chatText ?? "(ไม่ใช่ข้อความ)");
             Broadcast(msg);
         });
         // [4 ก.ย. 2026] พอร์ตแชทก็ต้อง "รับให้ได้ทุกแพ็กเก็ต" เหมือนพอร์ตเกม — client ยิง Keepalive /

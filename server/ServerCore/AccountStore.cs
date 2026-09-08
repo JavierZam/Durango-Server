@@ -78,6 +78,27 @@ public static class AccountStore
         return Path.Combine(SaveStore.Root, "owners", SafeName(ownerKey) + ".json");
     }
 
+    private static readonly Dictionary<string, string> _ipToLatestOwner = new Dictionary<string, string>();
+
+    public static void RegisterOwnerForIp(string ip, string ownerKey)
+    {
+        if (string.IsNullOrEmpty(ip) || string.IsNullOrEmpty(ownerKey)) return;
+        lock (_ipToLatestOwner)
+        {
+            _ipToLatestOwner[NormalizeIp(ip)] = ownerKey;
+        }
+    }
+
+    public static string GetLatestOwnerForIp(string ip)
+    {
+        if (string.IsNullOrEmpty(ip)) return null;
+        lock (_ipToLatestOwner)
+        {
+            _ipToLatestOwner.TryGetValue(NormalizeIp(ip), out string key);
+            return key;
+        }
+    }
+
     private static void RememberOwner(string ownerKey)
     {
         if (string.IsNullOrEmpty(ownerKey))
@@ -348,35 +369,26 @@ public static class AccountStore
             return byIp;
         }
 
+        RegisterOwnerForIp(remoteIp, ownerKey);
+
         List<Account> owned = byIp.FindAll(account =>
             !string.IsNullOrEmpty(account.OwnerKey)
             && string.Equals(account.OwnerKey, ownerKey, StringComparison.Ordinal));
-        if (owned.Count > 0)
-        {
-            RememberOwner(ownerKey);
-            return owned;
-        }
 
-        // Once an installation has been seen, an empty list really means it has
-        // no characters. Do not migrate another old localhost test character
-        // after the owner deletes their final character.
-        if (SaveStore.Peek<OwnerRecord>(OwnerPath(ownerKey)) != null)
-        {
-            return owned;
-        }
-
-        Account legacy = byIp.Find(account => string.IsNullOrEmpty(account.OwnerKey));
-        if (legacy != null)
+        // 🐛 [แก้ปัญหาตัวละครหายตอนเปิดเกมใหม่]:
+        // client ไม่ได้ส่ง account_id มาตอนสร้างตัวละคร (/players) ทำให้ OwnerKey เป็น null
+        // ผูกตัวละครทั้งหมดจาก IP เดียวกันที่ยังไม่มี OwnerKey เข้ากับ ownerKey เครื่องนี้ทันที
+        List<Account> unassigned = byIp.FindAll(account => string.IsNullOrEmpty(account.OwnerKey));
+        foreach (Account legacy in unassigned)
         {
             legacy.OwnerKey = ownerKey;
             SaveStore.Save(PathFor(legacy.EntityId), legacy);
-            Console.WriteLine($"[account] migrated legacy owner {legacy.EntityId} -> {ownerKey}");
+            Console.WriteLine($"[account] ผูกตัวละคร {legacy.EntityId} ({legacy.Name}) เข้ากับ owner {ownerKey}");
             owned.Add(legacy);
         }
 
-        // Remember even a brand-new owner with no legacy data so repeated empty
-        // account requests stay empty until that owner creates a character.
         RememberOwner(ownerKey);
+        owned.Sort((a, b) => b.LastSeenAt.CompareTo(a.LastSeenAt));
         return owned;
     }
 

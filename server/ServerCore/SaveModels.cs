@@ -372,6 +372,27 @@ public sealed class PlayerSave : SaveEnvelope
 
     /// <summary>ตำแหน่งในแคลน (0=member, 1=officer, 2=leader — ดู ClanRoleId)</summary>
     public int ClanRoleId { get; set; }
+
+    // ── Pets ──────────────────────────────────────────────────────────
+    public List<PetSave> Pets { get; set; } = new List<PetSave>();
+}
+
+// ── Pet ─────────────────────────────────────────────────────────────────
+
+public sealed class PetSave
+{
+    public string EntityId { get; set; }
+    public ushort EntityType { get; set; }
+    public string Name { get; set; }
+    public int Rank { get; set; } = 12; // PetRank.B
+    public int Level { get; set; } = 1;
+    public int Exp { get; set; }
+    public float Life { get; set; } = 100f;
+    public float LifeMax { get; set; } = 100f;
+    public float Hungry { get; set; } = 100f;
+    public float HungryMax { get; set; } = 100f;
+    public bool IsSpawned { get; set; }
+    public bool IsBoarding { get; set; }
 }
 
 // ── Mail ────────────────────────────────────────────────────────────────

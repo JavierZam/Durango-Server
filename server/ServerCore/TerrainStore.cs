@@ -91,6 +91,19 @@ public class TerrainStore
         }
     }
 
+    public static Shared.Region.Biome DetectDefaultBiome(string terrainId)
+    {
+        string t = (terrainId ?? "").ToLowerInvariant();
+        if (t.Contains("sn") || t.Contains("snow")) return Shared.Region.Biome.SnowField;
+        if (t.Contains("de") || t.Contains("desert")) return Shared.Region.Biome.Desert;
+        if (t.Contains("vo") || t.Contains("volcan")) return Shared.Region.Biome.Volcanic;
+        if (t.Contains("tr") || t.Contains("tropic")) return Shared.Region.Biome.TropicalForest;
+        if (t.Contains("sw") || t.Contains("swamp")) return Shared.Region.Biome.SwampMud;
+        if (t.Contains("tu") || t.Contains("tundra")) return Shared.Region.Biome.Tundra;
+        if (t.Contains("gr")) return Shared.Region.Biome.Grassland;
+        return Shared.Region.Biome.TemperateForest;
+    }
+
     /// <summary>สรุปสัดส่วนไบโอมของเกาะนี้ (พิมพ์ตอนเปิดเซิร์ฟ ไว้ดูว่าเกาะหน้าตายังไง)</summary>
     private void ReportBiomes()
     {
@@ -381,6 +394,11 @@ public class TerrainStore
         if (Biomes.Length < Width * Height)
         {
             Biomes = new byte[Width * Height];
+            byte defaultBiome = (byte)DetectDefaultBiome(terrainId);
+            if (defaultBiome != 0)
+            {
+                Array.Fill(Biomes, defaultBiome);
+            }
         }
         int vCount = (Width + 1) * (Height + 1);
         if (Ocean.Length < vCount)
