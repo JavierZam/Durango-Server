@@ -675,6 +675,21 @@ public partial class ServerPlayer
             msg.Message = StampSpeaker(msg.Message);
             _world.Broadcast(msg);
         });
+        _conn.Recv<Say>(delegate(Say msg, PacketHeader header)
+        {
+            string chatText = ChatBody.ReadText(msg.Message.Body);
+            if (!string.IsNullOrWhiteSpace(chatText) && chatText.StartsWith("/"))
+            {
+                RunAdminCheat(chatText);
+                return;
+            }
+            if (!AcceptChat(ref msg.Message))
+            {
+                return;
+            }
+            msg.Message = StampSpeaker(msg.Message);
+            _world.Broadcast(msg);
+        });
         _conn.Recv<DisappearEntityOnTile>(delegate(DisappearEntityOnTile msg, PacketHeader header)
         {
             // GP-09: เดิมลบตาม tile ที่ client บอกดื้อ ๆ — ส่ง packet รัวก็ถางป่าทั้งแมพจากมุมไหนก็ได้
@@ -1011,7 +1026,7 @@ public partial class ServerPlayer
     /// (GameManager.DefaultInfoHandler ดูแค่ "##goto") — ที่แสดงได้คือ <c>RadioNotice</c> ในช่องแชทระบบ
     /// ซึ่ง SocialSystem.OnSay เรียก UIManager.SystemMsg ให้เอง (+ ขึ้นเป็นบรรทัดในแท็บ "ระบบ" ด้วย)
     /// </summary>
-    public void SendNotice(string text, string speaker = "ประกาศ")
+    public void SendNotice(string text, string speaker = "Pengumuman")
     {
         if (string.IsNullOrEmpty(text)) return;
         Send(new SayInExclusiveChannel
@@ -1027,7 +1042,7 @@ public partial class ServerPlayer
         });
     }
 
-    public void SendSystemChat(string text, string speaker = "ระบบ")
+    public void SendSystemChat(string text, string speaker = "Sistem")
     {
         if (string.IsNullOrEmpty(text)) return;
         Send(new SayInExclusiveChannel

@@ -114,7 +114,7 @@ public partial class ServerPlayer
     {
         if (!_world.Terrain.TryFindNaturalNear(CurrentPosition, MaxReachTiles, out Point2 tile, out ushort type))
         {
-            return "ไม่มีของธรรมชาติในระยะเอื้อม";
+            return "Tidak ada sumber daya alam dalam jangkauan.";
         }
         var touch = new Touch
         {
@@ -126,10 +126,10 @@ public partial class ServerPlayer
         Generator[] gens = _world.PeekGenerators(touch.EntityId);
         if (gens == null || gens.Length == 0)
         {
-            return $"แตะ tile {tile.x},{tile.y} แล้วแต่ไม่มีอะไรให้เก็บ";
+            return $"Menyentuh tile {tile.x},{tile.y} tetapi tidak ada yang bisa diambil.";
         }
         HandleCollect(new Collect { EntityId = touch.EntityId, GeneratorId = gens[0].Id, Tile = tile }, default);
-        return $"เก็บ {gens[0].Name} ที่ tile {tile.x},{tile.y}";
+        return $"Mengambil {gens[0].Name} di tile {tile.x},{tile.y}";
     }
 
     /// <summary>ตีสัตว์ที่ใกล้ที่สุดด้วยท่าแรกของอาวุธที่ถืออยู่</summary>
@@ -156,12 +156,12 @@ public partial class ServerPlayer
         }
         if (best == null)
         {
-            return "ไม่มีสัตว์ในโลก";
+            return "Tidak ada dinosaurus atau hewan di sekitar.";
         }
         string[] actions = ActionData.ForWeaponTag(CurrentWeaponTag());
         if (actions.Length == 0)
         {
-            return "ไม่มีท่าโจมตี";
+            return "Tidak ada skill serangan.";
         }
         HandleUseBattleAction(new UseBattleAction
         {
@@ -170,7 +170,7 @@ public partial class ServerPlayer
             TargetEntityId = best.EntityId,
             TargetTile = new Point2((int)(best.Position.x / 200f), (int)(best.Position.y / 200f))
         }, default);
-        return $"ตี {best.EntityId} (type {best.EntityType} lv{best.Level}, ห่าง {bestDist / 200f:F1} tile)";
+        return $"Menyerang {best.EntityId} (type {best.EntityType} Lv.{best.Level}, jarak {bestDist / 200f:F1} tile)";
     }
 
     /// <summary>
@@ -181,7 +181,7 @@ public partial class ServerPlayer
     {
         ServerAnimal born = _world.Animals.SpawnAt(CurrentPosition, entityType, CurrentHeight);
         SpawnTable.Entry e = SpawnTable.Find(born.EntityType);
-        return $"เรียก {e?.Name ?? ("type " + born.EntityType)} lv{born.Level} มาเกิดข้าง {Name}";
+        return $"Memanggil {e?.Name ?? ("type " + born.EntityType)} Lv.{born.Level} di dekat {Name}";
     }
 
     /// <summary>ฆ่าสัตว์ตัวที่ใกล้ผู้เล่นคนนั้นที่สุด — ได้ซากไว้เทสการแล่เนื้อทันที</summary>
@@ -208,11 +208,11 @@ public partial class ServerPlayer
         }
         if (best == null)
         {
-            return "ไม่มีสัตว์เป็น ๆ ในโลก";
+            return "Tidak ada dinosaurus atau hewan hidup di sekitar.";
         }
         // ให้เครดิตคนที่ถูกสั่ง ไม่ใช่ admin — ซากจะได้เรืองแสงให้คนที่ยืนอยู่ตรงนั้น
         _world.Animals.Damage(best.EntityId, best.LifeMax * 2f, EntityId);
-        return $"ฆ่า {best.EntityId} (type {best.EntityType} lv{best.Level}) ห่าง {bestDist / 200f:F1} tile — แตะซากเพื่อแล่ได้เลย";
+        return $"Berhasil membunuh {best.EntityId} (type {best.EntityType} Lv.{best.Level}) jarak {bestDist / 200f:F1} tile — sentuh bangkai untuk butchering";
     }
 
     /// <summary>เติมเลือด/สตามินาให้เต็ม + ล้างความล้า (ฟื้นให้ด้วยถ้าตายอยู่)</summary>
@@ -227,7 +227,7 @@ public partial class ServerPlayer
         {
             RestoreSurvival(clearFatigue: true);
         }
-        return wasDead ? $"ฟื้น {Name} แล้ว (วาร์ปกลับจุดเกิด)" : $"เติมเลือด/สตามินา/ล้างความล้าให้ {Name} แล้ว";
+        return wasDead ? $"Membangkitkan {Name} (teleport ke titik spawn)" : $"Memulihkan darah/stamina/menghapus kelelahan {Name}";
     }
 
     /// <summary>เสกของทดสอบให้ผู้เล่นคนนั้น</summary>
@@ -236,63 +236,63 @@ public partial class ServerPlayer
         switch (what)
         {
             case "axe":
-                GiveEquipTestItem("axe_onehand_stone_01", "ขวานหิน", "weapon_axe_onehand_stone_2", 0);
-                return $"ให้ขวานหินกับ {Name}";
+                GiveEquipTestItem("axe_onehand_stone_01", "Kapak Batu", "weapon_axe_onehand_stone_2", 0);
+                return $"Memberikan Kapak Batu kepada {Name}";
             case "clothes":
-                GiveEquipTestItem("clothes_builder_01", "ชุดช่าง", "clothes_builder_01", 0);
-                return $"ให้ชุดช่างกับ {Name}";
+                GiveEquipTestItem("clothes_builder_01", "Pakaian Tukang", "clothes_builder_01", 0);
+                return $"Memberikan Pakaian Tukang kepada {Name}";
             case "bonfire":
                 lock (_inventory)
                 {
-                    _inventory.Add(MakeCapsuleItem("capsulated_bonfire", "กองไฟ", "furniture_workbench_bonfire"));
+                    _inventory.Add(MakeCapsuleItem("capsulated_bonfire", "Api Unggun", "furniture_workbench_bonfire"));
                 }
                 MarkDirty();
                 SendInventory();
-                return $"ให้กองไฟกับ {Name}";
+                return $"Memberikan Api Unggun kepada {Name}";
             case "tent":
                 lock (_inventory)
                 {
-                    _inventory.Add(MakeCapsuleItem("capsulated_tent", "เต็นท์", "building_house_tent"));
+                    _inventory.Add(MakeCapsuleItem("capsulated_tent", "Tenda", "building_house_tent"));
                 }
                 MarkDirty();
                 SendInventory();
-                return $"ให้เต็นท์กับ {Name}";
+                return $"Memberikan Tenda kepada {Name}";
             case "temptent":
             case "temp tent":
                 lock (_inventory)
                 {
-                    _inventory.Add(MakeCapsuleItem("capsulated_temptent", "เต็นท์ชั่วคราว", "building_house_temp"));
+                    _inventory.Add(MakeCapsuleItem("capsulated_temptent", "Tenda Darurat", "building_house_temp"));
                 }
                 MarkDirty();
                 SendInventory();
-                return $"ให้เต็นท์ชั่วคราวกับ {Name}";
+                return $"Memberikan Tenda Darurat kepada {Name}";
             case "worktable":
             case "fur_table":
                 lock (_inventory)
                 {
-                    _inventory.Add(MakeCapsuleItem("capsulated_fur_table", "โต๊ะคราฟต์", "furniture_fur_table_01"));
+                    _inventory.Add(MakeCapsuleItem("capsulated_fur_table", "Meja Kerja", "furniture_fur_table_01"));
                 }
                 MarkDirty();
                 SendInventory();
-                return $"ให้โต๊ะคราฟต์กับ {Name}";
+                return $"Memberikan Meja Kerja kepada {Name}";
             case "box":
                 lock (_inventory)
                 {
-                    _inventory.Add(MakeCapsuleItem("capsulated_fur_box_03_leaf", "กล่องใบไม้", "furniture_box"));
+                    _inventory.Add(MakeCapsuleItem("capsulated_fur_box_03_leaf", "Kotak Daun", "furniture_box"));
                 }
                 MarkDirty();
                 SendInventory();
-                return $"ให้กล่องใบไม้กับ {Name}";
+                return $"Memberikan Kotak Daun kepada {Name}";
             // วัตถุดิบพื้นฐาน — ไว้เทสสายคราฟต์ในเกมจริง (หิน 5 ก้อน = คราฟต์มีดหินได้เลย)
             case "stone":
                 for (int i = 0; i < 5; i++)
                 {
-                    GiveEquipTestItem("stone", "หิน", "icon_nat_stone", 0);
+                    GiveEquipTestItem("stone", "Batu", "icon_nat_stone", 0);
                 }
-                return $"ให้หิน 5 ก้อนกับ {Name} (คราฟต์ใบมีดหินได้เลย)";
+                return $"Memberikan 5 Batu kepada {Name} (Bisa langsung craft pisau batu)";
             case "knife":
-                GiveEquipTestItem("blade_stone", "ใบมีดหิน", "icon_nat_blade_stone", 0);
-                return $"ให้ใบมีดหินกับ {Name}";
+                GiveEquipTestItem("blade_stone", "Pisau Batu", "icon_nat_blade_stone", 0);
+                return $"Memberikan Pisau Batu kepada {Name}";
             // ชุดทำอาหารครบเซ็ต — ไว้เทสเช็คลิสต์ทำอาหารโดยไม่ต้องออกไปล่า/ขุดดินเอง
             case "cook":
             case "cookkit":
@@ -303,24 +303,24 @@ public partial class ServerPlayer
                 GiveByPrototype("grill_stone", 1, out _);
                 lock (_inventory)
                 {
-                    _inventory.Add(MakeCapsuleItem("capsulated_bonfire", "กองไฟ", "furniture_workbench_bonfire"));
-                    _inventory.Add(MakeCapsuleItem("capsulated_bonfire_01", "กองไฟใหญ่", "furniture_workbench_bonfire_01"));
+                    _inventory.Add(MakeCapsuleItem("capsulated_bonfire", "Api Unggun", "furniture_workbench_bonfire"));
+                    _inventory.Add(MakeCapsuleItem("capsulated_bonfire_01", "Api Unggun Besar", "furniture_workbench_bonfire_01"));
                 }
                 MarkDirty();
                 SendInventory();
-                return $"ให้ชุดทำอาหารกับ {Name} — เนื้อ 3 · กิ่งไม้ 2 · น้ำ 2 · หม้อ · เตาย่าง · กองไฟ + กองไฟใหญ่";
+                return $"Memberikan perlengkapan memasak kepada {Name} — Daging 3 · Ranting 2 · Air 2 · Panci · Panggangan · Api Unggun";
             default:
                 // ชื่อ prototype ตรง ๆ ก็ให้ได้ (`control <ชื่อ> give meat`) — เทสสูตรไหนก็เสกของนั้น
                 if (GiveByPrototype(what, count, out int given))
                 {
-                    string msg = $"ให้ {ItemNameData.NameOf(what, what)} x{given} กับ {Name}";
+                    string msg = $"Memberikan {ItemNameData.NameOf(what, what)} x{given} kepada {Name}";
                     if (given < count)
                     {
-                        msg += $" (ขอ {count} แต่กระเป๋าเหลือที่แค่ {given} ช่อง)";
+                        msg += $" (Meminta {count} tetapi tas hanya tersisa {given} slot)";
                     }
                     return msg;
                 }
-                return "ให้ได้: axe · clothes · bonfire · box · stone · knife · cook (ชุดทำอาหาร) หรือชื่อ prototype ตรง ๆ";
+                return "Dapat diberikan: axe · clothes · bonfire · box · stone · knife · cook atau nama prototype langsung";
         }
     }
 
