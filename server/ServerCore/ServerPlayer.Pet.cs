@@ -146,7 +146,21 @@ public partial class ServerPlayer
                 Level = Math.Max(1, pet.Level),
                 Exp = pet.Exp,
                 RequiredExp = Math.Max(100, pet.Level * 100),
-                DerivedAbilities = new Dictionary<Derived, float>(),
+                DerivedAbilities = new Dictionary<Derived, float>
+                {
+                    [Derived.Speed] = 650f + (Math.Max(1, pet.Level) * 2.5f),
+                    [Derived.Attack] = 50f + (Math.Max(1, pet.Level) * 5f),
+                    [Derived.Defense] = 20f + (Math.Max(1, pet.Level) * 2f),
+                    [Derived.MaxHealth] = pet.LifeMax > 0 ? pet.LifeMax : 1000f,
+                    [Derived.LifeMax] = pet.LifeMax > 0 ? pet.LifeMax : 1000f,
+                    [Derived.MaxEnergy] = 1000f,
+                    [Derived.StaminaMax] = pet.StaminaMax > 0 ? pet.StaminaMax : 100f,
+                    [Derived.HungryMax] = pet.HungryMax > 0 ? pet.HungryMax : 100f,
+                    [Derived.Accuracy] = 50f + Math.Max(1, pet.Level),
+                    [Derived.Evade] = 20f + Math.Max(1, pet.Level),
+                    [Derived.Critical] = 10f,
+                    [Derived.InventoryCapacity] = 10f
+                },
                 MilestonesInformation = Array.Empty<MilestoneInfo>(),
                 AvailableActiveSkill = Array.Empty<PetActiveSkill>()
             },

@@ -900,7 +900,8 @@ public partial class ServerPlayer
             float dx = moveDx;
             float dy = moveDy;
             float dist = moveDistance;
-            float allowed = (float)(MaxMoveSpeed * dt) + MoveSlack;
+            float maxSpeed = (_spawnedPet != null && _spawnedPet.IsBoarding) ? 1400f : MaxMoveSpeed;
+            float allowed = (float)(maxSpeed * dt) + MoveSlack;
             if (dist > allowed)
             {
                 // เกินนิดหน่อย (เน็ตกระตุกแล้ว client ส่ง Move ที่ค้างมาทีเดียว) = ไม่รับ move นี้เฉย ๆ
@@ -932,6 +933,14 @@ public partial class ServerPlayer
         _lastFloor = dest.Floor;
         _world.NoteGroundHeight(dest.Height);
         _hasPosition = true;
+        if (_spawnedPet != null && _spawnedPet.IsBoarding)
+        {
+            _petPosition = dest.Position;
+            _petYaw = dest.Yaw;
+            _petHeight = dest.Height;
+            _petFrom = dest.Position;
+            _petTo = dest.Position;
+        }
         // Move packets ที่เกิดจากการ snap เข้า attachment/แก้ jitter ไม่ควรทำให้การพักหลุด
         // หยุดพักเฉพาะเมื่อผู้เล่นขยับจริงเกินระยะ epsilon
         if (moveDistance > 10f && !(_resting && nowSec <= _restMovementGraceUntil))
