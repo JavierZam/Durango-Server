@@ -311,6 +311,7 @@ public partial class ServerPlayer
         ProcessWetness(now);           // บั๊ก #7 — เปียกจากน้ำ/ฝน · ล้างตัวหายสกปรก
         ProcessAnnouncement(now);      // ประกาศค้างจาก config
         ProcessDeathBox(now);          // [TodoList/07] กล่องของตกหมดเวลา
+        ProcessPet(now);               // ระบบ AI และ Follow ของสัตว์เลี้ยง
         // กันกรณี client ไม่ส่ง SetChunk/Move เลย (ยืนนิ่งตั้งแต่เข้า) — ปล่อยสัตว์เองหลัง 10 วิ
         if (!SceneReady && now - _spawnedAt > 10.0) { MarkSceneReady(); }
     }

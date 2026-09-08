@@ -155,6 +155,7 @@ public partial class ServerPlayer
         _conn.Recv<FinishDomestication>(HandleFinishDomestication);
         _conn.Recv<CancelDomestication>(HandleCancelDomestication);
         _conn.Recv<UseTamingAction>(HandleUseTamingAction);
+        _conn.Recv<Feeding>(HandleFeeding);
         _conn.Recv<PutInCage>(HandlePutInCage);
         _conn.Recv<FeedInCage>(HandleFeedInCage);
         _conn.Recv<RenamePet>(HandleRenamePet);
@@ -203,8 +204,8 @@ public partial class ServerPlayer
 
     private void HandleFeedInCage(FeedInCage msg, PacketHeader header)
     {
-        if (!ServerConfig.Current.Features.Livestock) { RejectLivestockDisabled(header); return; }
-        Send(new Info { Text = "คำสั่งนี้ยังไม่รองรับบนเซิร์ฟนี้" }, header.Seq);
+        if (!ServerConfig.Current.Features.Livestock && !ServerConfig.Current.Features.Taming) { RejectLivestockDisabled(header); return; }
+        HandleFeeding(new Feeding { PetId = msg.EntityId, FoodIds = msg.ItemIds }, header);
     }
 
     private bool RejectLivestockDisabled(PacketHeader header)

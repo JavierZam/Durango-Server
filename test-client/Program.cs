@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading;
@@ -308,6 +308,15 @@ public static class Program
             int p = args.Length >= 3 ? int.Parse(args[2]) : 8191;
             int gw = args.Length >= 4 ? int.Parse(args[3]) : p - 1;
             Environment.ExitCode = CharacterSystemsCheck.Run(h, p, gw);
+            return;
+        }
+
+        if (args.Length >= 1 && args[0] == "--pet-check")
+        {
+            string h = args.Length >= 2 ? args[1] : null;
+            int p = args.Length >= 3 ? int.Parse(args[2]) : 0;
+            int gw = args.Length >= 4 ? int.Parse(args[3]) : 0;
+            Environment.ExitCode = PetCheck.Run(h, p, gw);
             return;
         }
 

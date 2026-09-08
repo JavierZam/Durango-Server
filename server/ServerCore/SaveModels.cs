@@ -391,8 +391,14 @@ public sealed class PetSave
     public float LifeMax { get; set; } = 100f;
     public float Hungry { get; set; } = 100f;
     public float HungryMax { get; set; } = 100f;
+    public float Stamina { get; set; } = 100f;
+    public float StaminaMax { get; set; } = 100f;
     public bool IsSpawned { get; set; }
     public bool IsBoarding { get; set; }
+    public bool StayMode { get; set; }
+    public float PosX { get; set; }
+    public float PosY { get; set; }
+    public float Yaw { get; set; }
 }
 
 // ── Mail ────────────────────────────────────────────────────────────────

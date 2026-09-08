@@ -377,7 +377,66 @@ public partial class ServerPlayer
                 return;
             }
 
-            SendCheatReply("Perintah pet: /pet list, /pet spawn <nama/nomor>, /pet return, /pet add <spesies> [level], /pet mount, /pet unmount", header);
+            if (sub == "stay" || sub == "stop")
+            {
+                if (_spawnedPet == null)
+                {
+                    SendCheatReply("Tidak ada pet yang aktif. Panggil pet dulu dengan /pet spawn.", header);
+                    return;
+                }
+                SetPetStay(true);
+                SendCheatReply($"Pet {_spawnedPet.Name} diperintahkan untuk diam di tempat (Stay).", header);
+                return;
+            }
+
+            if (sub == "follow" || sub == "come")
+            {
+                if (_spawnedPet == null)
+                {
+                    SendCheatReply("Tidak ada pet yang aktif. Panggil pet dulu dengan /pet spawn.", header);
+                    return;
+                }
+                SetPetStay(false);
+                SendCheatReply($"Pet {_spawnedPet.Name} diperintahkan untuk mengikuti kamu (Follow).", header);
+                return;
+            }
+
+            if (sub == "feed")
+            {
+                if (_spawnedPet == null)
+                {
+                    SendCheatReply("Tidak ada pet yang aktif. Panggil pet dulu dengan /pet spawn.", header);
+                    return;
+                }
+
+                Item food = default;
+                bool foundFood = false;
+                lock (_inventory)
+                {
+                    int idx = _inventory.FindIndex(it => IsEdible(it) || it.Prototype.Contains("meat") || it.Prototype.Contains("fruit") || it.Prototype.Contains("bread"));
+                    if (idx >= 0)
+                    {
+                        food = _inventory[idx];
+                        foundFood = true;
+                        _inventory.RemoveAt(idx);
+                    }
+                }
+
+                if (foundFood)
+                {
+                    FeedPet(_spawnedPet, food);
+                    Send(new InventoryUpdated { EntityId = EntityId, RemovedItemIds = new[] { food.Id } });
+                    SendInventory();
+                    SendCheatReply($"Memberi makan {_spawnedPet.Name} dengan {food.Name}! (Hungry: {_spawnedPet.Hungry:F0}/{_spawnedPet.HungryMax:F0})", header);
+                }
+                else
+                {
+                    SendCheatReply("Tidak ada makanan di tas untuk diberikan ke pet.", header);
+                }
+                return;
+            }
+
+            SendCheatReply("Perintah pet: /pet list, /pet spawn <nama/nomor>, /pet return, /pet add <spesies> [level], /pet mount, /pet unmount, /pet stay, /pet follow, /pet feed", header);
             return;
         }
 
@@ -402,6 +461,30 @@ public partial class ServerPlayer
             }
             UnmountPetInternal();
             SendCheatReply($"Turun dari pet {_spawnedPet.Name}.", header);
+            return;
+        }
+
+        if (cmd.Equals("stay", StringComparison.Ordinal) || cmd.Equals("stop", StringComparison.Ordinal))
+        {
+            if (_spawnedPet == null)
+            {
+                SendCheatReply("Tidak ada pet yang aktif. Panggil pet dulu dengan /pet spawn.", header);
+                return;
+            }
+            SetPetStay(true);
+            SendCheatReply($"Pet {_spawnedPet.Name} diperintahkan untuk diam di tempat (Stay).", header);
+            return;
+        }
+
+        if (cmd.Equals("follow", StringComparison.Ordinal) || cmd.Equals("come", StringComparison.Ordinal))
+        {
+            if (_spawnedPet == null)
+            {
+                SendCheatReply("Tidak ada pet yang aktif. Panggil pet dulu dengan /pet spawn.", header);
+                return;
+            }
+            SetPetStay(false);
+            SendCheatReply($"Pet {_spawnedPet.Name} diperintahkan untuk mengikuti kamu (Follow).", header);
             return;
         }
 

@@ -15,13 +15,53 @@ public partial class ServerPlayer
     private readonly List<PetSave> _pets = new List<PetSave>();
     private PetSave _spawnedPet;
 
+    private WorldPosition _petPosition;
+    private float _petYaw;
+    private float _petHeight;
+    private WorldPosition _petFrom;
+    private WorldPosition _petTo;
+    private double _petMoveStartAt;
+    private double _petMoveEndAt;
+    private double _lastPetFollowTickAt;
+    private bool _petStayMode;
+
     public IReadOnlyList<PetSave> Pets => _pets;
     public PetSave SpawnedPet => _spawnedPet;
+    public bool PetStayMode => _petStayMode;
+
+    private static ushort GetPetMotionType(ushort petEntityType)
+    {
+        PetTemplate tmpl = PetData.FindByEntityType(petEntityType);
+        if (tmpl != null && tmpl.VehicleEntityType > 0)
+        {
+            return tmpl.VehicleEntityType;
+        }
+        return petEntityType;
+    }
+
+    public WorldPosition PetPositionAt(double now)
+    {
+        if (_spawnedPet == null) return CurrentPosition;
+        if (_spawnedPet.IsBoarding) return CurrentPosition;
+        if (_petMoveEndAt <= _petMoveStartAt || now >= _petMoveEndAt)
+        {
+            return _petTo;
+        }
+        if (now <= _petMoveStartAt)
+        {
+            return _petFrom;
+        }
+        float t = (float)((now - _petMoveStartAt) / (_petMoveEndAt - _petMoveStartAt));
+        return new WorldPosition(
+            _petFrom.x + (_petTo.x - _petFrom.x) * t,
+            _petFrom.y + (_petTo.y - _petFrom.y) * t);
+    }
 
     private void ApplyPetSave(PlayerSave save)
     {
         _pets.Clear();
         _spawnedPet = null;
+        _petStayMode = false;
         if (save?.Pets != null)
         {
             foreach (var p in save.Pets)
@@ -32,6 +72,19 @@ public partial class ServerPlayer
                     if (p.IsSpawned)
                     {
                         _spawnedPet = p;
+                        _petStayMode = p.StayMode;
+                        if (p.PosX != 0f || p.PosY != 0f)
+                        {
+                            _petPosition = new WorldPosition(p.PosX, p.PosY);
+                            _petYaw = p.Yaw;
+                        }
+                        else
+                        {
+                            _petPosition = CurrentPosition;
+                            _petYaw = CurrentYaw;
+                        }
+                        _petFrom = _petPosition;
+                        _petTo = _petPosition;
                     }
                 }
             }
@@ -42,6 +95,13 @@ public partial class ServerPlayer
     {
         if (save == null) return;
         save.Pets.Clear();
+        if (_spawnedPet != null)
+        {
+            _spawnedPet.StayMode = _petStayMode;
+            _spawnedPet.PosX = _petPosition.x;
+            _spawnedPet.PosY = _petPosition.y;
+            _spawnedPet.Yaw = _petYaw;
+        }
         foreach (var p in _pets)
         {
             if (p != null)
@@ -97,6 +157,11 @@ public partial class ServerPlayer
     public AppearPet MakeAppearPet(PetSave pet)
     {
         double now = Times.UnixTimeNow();
+        ushort motionType = GetPetMotionType(pet.EntityType);
+        string motionName = AnimalMotionData.Stand(motionType) ?? "idle";
+        WorldPosition pos = pet.IsBoarding ? CurrentPosition : (_petPosition.x != 0f || _petPosition.y != 0f ? _petPosition : CurrentPosition);
+        float yaw = pet.IsBoarding ? CurrentYaw : _petYaw;
+
         return new AppearPet
         {
             EntityId = pet.EntityId,
@@ -109,19 +174,19 @@ public partial class ServerPlayer
                 {
                     new Movement
                     {
-                        MotionName = "idle",
-                        MotionOption = 0,
+                        MotionName = motionName,
+                        MotionOption = 5,
                         PlaybackRate = 1f,
-                        RotSpeed = 0f,
+                        RotSpeed = 540f,
                         Path = new[]
                         {
                             new Location
                             {
-                                Position = CurrentPosition,
-                                Yaw = CurrentYaw,
+                                Position = pos,
+                                Yaw = yaw,
                                 Time = now,
                                 Floor = 0,
-                                Height = 0f
+                                Height = _petHeight
                             }
                         }
                     }
@@ -190,6 +255,15 @@ public partial class ServerPlayer
         pet.IsBoarding = false;
         _spawnedPet = pet;
 
+        float rad = (CurrentYaw + 90f) * (MathF.PI / 180f);
+        _petPosition = new WorldPosition(CurrentPosition.x + MathF.Sin(rad) * 150f, CurrentPosition.y + MathF.Cos(rad) * 150f);
+        _petYaw = CurrentYaw;
+        _petHeight = _lastHeight;
+        _petFrom = _petPosition;
+        _petTo = _petPosition;
+        _petMoveStartAt = 0;
+        _petMoveEndAt = 0;
+
         AppearPet appear = MakeAppearPet(pet);
         Send(appear);
         _world.BroadcastToViewers(EntityId, appear, except: this);
@@ -248,6 +322,14 @@ public partial class ServerPlayer
         }
 
         _spawnedPet.IsBoarding = true;
+        _petPosition = CurrentPosition;
+        _petYaw = CurrentYaw;
+        _petHeight = _lastHeight;
+        _petFrom = CurrentPosition;
+        _petTo = CurrentPosition;
+        _petMoveStartAt = 0;
+        _petMoveEndAt = 0;
+
         var petMsg = ConvertToPetMessage(_spawnedPet);
         Send(petMsg);
         _world.BroadcastToViewers(EntityId, petMsg, except: this);
@@ -268,6 +350,15 @@ public partial class ServerPlayer
         }
 
         _spawnedPet.IsBoarding = false;
+        float rad = (CurrentYaw - 90f) * (MathF.PI / 180f);
+        _petPosition = new WorldPosition(CurrentPosition.x + MathF.Sin(rad) * 150f, CurrentPosition.y + MathF.Cos(rad) * 150f);
+        _petYaw = CurrentYaw;
+        _petHeight = _lastHeight;
+        _petFrom = _petPosition;
+        _petTo = _petPosition;
+        _petMoveStartAt = 0;
+        _petMoveEndAt = 0;
+
         var petMsg = ConvertToPetMessage(_spawnedPet);
         Send(petMsg);
         _world.BroadcastToViewers(EntityId, petMsg, except: this);
@@ -310,6 +401,12 @@ public partial class ServerPlayer
         {
             Send(new Info { Text = "เป้าหมายอยู่ไกลเกินไป" }, header.Seq);
             return;
+        }
+
+        // If a tool/item was used for taming, consume or damage it
+        if (!string.IsNullOrEmpty(msg.ToolItemId))
+        {
+            WearTool(msg.ToolItemId, WearKind.Taming);
         }
 
         // Send progress timer for client animation
@@ -446,5 +543,291 @@ public partial class ServerPlayer
         Send(new OK(), header.Seq);
         SendPetsInfo();
         MarkDirty();
+    }
+
+    public void SetPetStay(bool stay)
+    {
+        _petStayMode = stay;
+        if (_spawnedPet != null)
+        {
+            _spawnedPet.StayMode = stay;
+            MarkDirty();
+            if (stay)
+            {
+                double now = Times.UnixTimeNow();
+                WorldPosition petPos = PetPositionAt(now);
+                _petFrom = petPos;
+                _petTo = petPos;
+                _petMoveStartAt = 0;
+                _petMoveEndAt = 0;
+                ushort motionType = GetPetMotionType(_spawnedPet.EntityType);
+                string motionName = AnimalMotionData.Stand(motionType) ?? "idle";
+                var standMove = new Move
+                {
+                    EntityId = _spawnedPet.EntityId,
+                    Movements = new[]
+                    {
+                        new Movement
+                        {
+                            MotionName = motionName,
+                            MotionOption = 5,
+                            PlaybackRate = 1f,
+                            RotSpeed = 540f,
+                            Path = new[]
+                            {
+                                new Location { Position = petPos, Yaw = _petYaw, Time = now, Floor = 0, Height = _lastHeight }
+                            }
+                        }
+                    }
+                };
+                Send(standMove);
+                _world.BroadcastToViewers(EntityId, standMove, except: this);
+                Send(new Info { Text = $"{_spawnedPet.Name} ได้รับคำสั่งให้อยู่กับที่ (Stay)" });
+            }
+            else
+            {
+                Send(new Info { Text = $"{_spawnedPet.Name} ได้รับคำสั่งให้ติดตามคุณ (Follow)" });
+            }
+        }
+    }
+
+    public void ProcessPet(double now)
+    {
+        if (_spawnedPet == null) return;
+
+        if (_spawnedPet.IsBoarding)
+        {
+            _petPosition = CurrentPosition;
+            _petYaw = CurrentYaw;
+            _petHeight = _lastHeight;
+            _petFrom = CurrentPosition;
+            _petTo = CurrentPosition;
+            return;
+        }
+
+        if (now - _lastPetFollowTickAt < 0.3) return;
+        _lastPetFollowTickAt = now;
+
+        if (_petStayMode) return;
+
+        WorldPosition petPos = PetPositionAt(now);
+        _petPosition = petPos;
+        WorldPosition playerPos = CurrentPosition;
+
+        float dx = playerPos.x - petPos.x;
+        float dy = playerPos.y - petPos.y;
+        float distSq = dx * dx + dy * dy;
+        float dist = MathF.Sqrt(distSq);
+
+        ushort motionType = GetPetMotionType(_spawnedPet.EntityType);
+
+        // If player travelled very far (> 3500 units / ~17.5 tiles), teleport pet near player
+        if (dist > 3500f)
+        {
+            float rad = (CurrentYaw + 180f) * (MathF.PI / 180f);
+            WorldPosition dest = new WorldPosition(playerPos.x + MathF.Sin(rad) * 150f, playerPos.y + MathF.Cos(rad) * 150f);
+            _petPosition = dest;
+            _petFrom = dest;
+            _petTo = dest;
+            _petYaw = CurrentYaw;
+            _petMoveStartAt = 0;
+            _petMoveEndAt = 0;
+
+            string motionName = AnimalMotionData.Stand(motionType) ?? "idle";
+            var teleMove = new Move
+            {
+                EntityId = _spawnedPet.EntityId,
+                Movements = new[]
+                {
+                    new Movement
+                    {
+                        MotionName = motionName,
+                        MotionOption = 5,
+                        PlaybackRate = 1f,
+                        RotSpeed = 540f,
+                        Path = new[]
+                        {
+                            new Location { Position = dest, Yaw = _petYaw, Time = now, Floor = 0, Height = _lastHeight }
+                        }
+                    }
+                }
+            };
+            Send(teleMove);
+            _world.BroadcastToViewers(EntityId, teleMove, except: this);
+            return;
+        }
+
+        // Close enough: stop moving
+        if (dist <= 260f)
+        {
+            if (now < _petMoveEndAt)
+            {
+                _petFrom = petPos;
+                _petTo = petPos;
+                _petMoveStartAt = 0;
+                _petMoveEndAt = 0;
+                string motionName = AnimalMotionData.Stand(motionType) ?? "idle";
+                var standMove = new Move
+                {
+                    EntityId = _spawnedPet.EntityId,
+                    Movements = new[]
+                    {
+                        new Movement
+                        {
+                            MotionName = motionName,
+                            MotionOption = 5,
+                            PlaybackRate = 1f,
+                            RotSpeed = 540f,
+                            Path = new[]
+                            {
+                                new Location { Position = petPos, Yaw = _petYaw, Time = now, Floor = 0, Height = _lastHeight },
+                                new Location { Position = petPos, Yaw = _petYaw, Time = now + 1.0, Floor = 0, Height = _lastHeight }
+                            }
+                        }
+                    }
+                };
+                Send(standMove);
+                _world.BroadcastToViewers(EntityId, standMove, except: this);
+            }
+            return;
+        }
+
+        // Far enough: calculate target position near player
+        float angleToPlayer = MathF.Atan2(dx, dy);
+        float targetYaw = angleToPlayer * (180f / MathF.PI);
+        if (targetYaw < 0f) targetYaw += 360f;
+
+        float stopDist = 160f;
+        WorldPosition destPos = new WorldPosition(
+            playerPos.x - MathF.Sin(angleToPlayer) * stopDist,
+            playerPos.y - MathF.Cos(angleToPlayer) * stopDist);
+
+        float moveDist = MathF.Sqrt(
+            (destPos.x - petPos.x) * (destPos.x - petPos.x) +
+            (destPos.y - petPos.y) * (destPos.y - petPos.y));
+
+        if (moveDist < 60f) return;
+
+        bool isRunning = dist >= 700f;
+        float speed = isRunning ? 520f : 280f;
+        double duration = Math.Max(0.2, moveDist / speed);
+
+        string anim = isRunning
+            ? (AnimalMotionData.Run(motionType) ?? "run")
+            : (AnimalMotionData.Walk(motionType) ?? "walk");
+
+        _petFrom = petPos;
+        _petTo = destPos;
+        _petMoveStartAt = now;
+        _petMoveEndAt = now + duration;
+        _petYaw = targetYaw;
+
+        var move = new Move
+        {
+            EntityId = _spawnedPet.EntityId,
+            Movements = new[]
+            {
+                new Movement
+                {
+                    MotionName = anim,
+                    MotionOption = 5,
+                    PlaybackRate = 1f,
+                    RotSpeed = 540f,
+                    Path = new[]
+                    {
+                        new Location { Position = petPos, Yaw = targetYaw, Time = now, Floor = 0, Height = _lastHeight },
+                        new Location { Position = destPos, Yaw = targetYaw, Time = now + duration, Floor = 0, Height = _lastHeight }
+                    }
+                }
+            }
+        };
+
+        Send(move);
+        _world.BroadcastToViewers(EntityId, move, except: this);
+    }
+
+    public bool FeedPet(PetSave pet, Item foodItem)
+    {
+        if (pet == null || string.IsNullOrEmpty(foodItem.Id)) return false;
+        pet.Hungry = Math.Min(pet.HungryMax, pet.Hungry + 35f);
+        pet.Life = Math.Min(pet.LifeMax, pet.Life + 30f);
+        pet.Stamina = Math.Min(pet.StaminaMax, pet.Stamina + 50f);
+        MarkDirty();
+
+        Send(new FeedingSuccess { PetId = pet.EntityId });
+        Send(ConvertToPetMessage(pet));
+        SendPetsInfo();
+        Send(new Info { Text = $"ให้อาหาร {foodItem.Name} แก่ {pet.Name} แล้ว (ความอิ่ม: {pet.Hungry:F0}/{pet.HungryMax:F0}, พลัง: {pet.Life:F0}/{pet.LifeMax:F0})" });
+        return true;
+    }
+
+    public void HandleFeeding(Feeding msg, PacketHeader header)
+    {
+        PetSave pet = _pets.FirstOrDefault(p => string.Equals(p.EntityId, msg.PetId, StringComparison.OrdinalIgnoreCase)) ?? _spawnedPet;
+        if (pet == null)
+        {
+            Send(new OK(), header.Seq);
+            return;
+        }
+
+        if (msg.FoodIds != null && msg.FoodIds.Length > 0)
+        {
+            List<string> removedIds = new List<string>();
+            lock (_inventory)
+            {
+                for (int i = 0; i < msg.FoodIds.Length; i++)
+                {
+                    string fid = msg.FoodIds[i];
+                    if (string.IsNullOrEmpty(fid)) continue;
+                    int idx = _inventory.FindIndex(it => it.Id == fid);
+                    if (idx >= 0)
+                    {
+                        Item item = _inventory[idx];
+                        _inventory.RemoveAt(idx);
+                        removedIds.Add(fid);
+                        FeedPet(pet, item);
+                        break;
+                    }
+                }
+            }
+
+            if (removedIds.Count > 0)
+            {
+                Send(new InventoryUpdated { EntityId = EntityId, RemovedItemIds = removedIds.ToArray() });
+                SendInventory();
+            }
+            else
+            {
+                Send(new Info { Text = "ไม่พบอาหารที่เลือกในกระเป๋า" });
+            }
+        }
+        else
+        {
+            Item food = default;
+            bool foundFood = false;
+            lock (_inventory)
+            {
+                int idx = _inventory.FindIndex(it => IsEdible(it) || it.Prototype.Contains("meat") || it.Prototype.Contains("fruit") || it.Prototype.Contains("bread"));
+                if (idx >= 0)
+                {
+                    food = _inventory[idx];
+                    foundFood = true;
+                    _inventory.RemoveAt(idx);
+                }
+            }
+
+            if (foundFood)
+            {
+                FeedPet(pet, food);
+                Send(new InventoryUpdated { EntityId = EntityId, RemovedItemIds = new[] { food.Id } });
+                SendInventory();
+            }
+            else
+            {
+                Send(new Info { Text = "ไม่มีอาหารในกระเป๋าที่จะให้สัตว์เลี้ยง" });
+            }
+        }
+
+        Send(new OK(), header.Seq);
     }
 }

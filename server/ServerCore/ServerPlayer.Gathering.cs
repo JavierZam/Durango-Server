@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -75,6 +75,13 @@ public partial class ServerPlayer
             Send(Aborts.Reason(), header.Seq);
             return;
         }
+        // สัตว์เลี้ยง (Pet) ของผู้เล่น
+        if (_spawnedPet != null && string.Equals(msg.EntityId, _spawnedPet.EntityId, StringComparison.OrdinalIgnoreCase))
+        {
+            HandleTouchPet(_spawnedPet, header);
+            return;
+        }
+
         // สัตว์: entity type 2000-2999 และ client ส่ง Tile = (-1,-1) มาเสมอ
         // (client/InteractionObject.cs → Tile คืน -Vector2.one ถ้าเป้าเป็น Animal)
         //
@@ -225,6 +232,34 @@ public partial class ServerPlayer
     private const float ButcheryRange = MaxReachTiles * 200f;
 
     /// <summary>
+    private void HandleTouchPet(PetSave pet, PacketHeader header)
+    {
+        var interactions = new List<int>();
+        if (pet.IsBoarding)
+        {
+            interactions.Add((int)Shared.System.Interaction.Dismount);
+        }
+        else
+        {
+            interactions.Add((int)Shared.System.Interaction.Mount);
+        }
+        interactions.Add((int)Shared.System.Interaction.Feeding);
+        interactions.Add((int)Shared.System.Interaction.ReturnPet);
+        interactions.Add((int)Shared.System.Interaction.RenamePet);
+
+        Touched reply = new Touched
+        {
+            EntityId = pet.EntityId,
+            EntityName = pet.Name,
+            Level = pet.Level,
+            Interactions = interactions.ToArray()
+        };
+
+        Send(reply, header.Seq);
+        Console.WriteLine("[touch] {0} แตะ pet {1} ({2}) — ให้เมนู Mount/Dismount/Feeding/Return", Name, pet.EntityId, pet.Name);
+    }
+
+    /// <summary>
     /// แตะสัตว์ — ยังไม่ตายให้ปุ่ม "โจมตี" · ตายแล้วให้เมนูแล่เนื้อ
     ///
     /// ซากถูกย้ายไป layer ของ prop ฝั่ง client (AnimalBehavior.OnDie) จึงแตะได้เหมือนของธรรมชาติ
@@ -242,8 +277,13 @@ public partial class ServerPlayer
 
         if (animal.IsAlive)
         {
-            reply.Interactions = new[] { InteractionAttack };
-            Console.WriteLine("[touch] {0} แตะ {1} ({2} lv{3}) — ให้ปุ่มโจมตี", Name, animal.EntityId, reply.EntityName, animal.Level);
+            var interactions = new List<int> { InteractionAttack };
+            if (ServerConfig.Current.Features.Taming && PetData.FindByVehicleEntityType(animal.EntityType) != null)
+            {
+                interactions.Add((int)Shared.System.Interaction.Cage);
+            }
+            reply.Interactions = interactions.ToArray();
+            Console.WriteLine("[touch] {0} แตะ {1} ({2} lv{3}) — ให้ปุ่มโจมตี/จับ", Name, animal.EntityId, reply.EntityName, animal.Level);
             Send(reply, header.Seq);
             return;
         }

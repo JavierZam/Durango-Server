@@ -148,11 +148,16 @@ public partial class ServerPlayer
         SendPetsInfo();
         if (_spawnedPet != null)
         {
-            Send(MakeAppearPet(_spawnedPet));
-            Send(ConvertToPetMessage(_spawnedPet));
+            AppearPet appear = MakeAppearPet(_spawnedPet);
+            Messages.Pet petMsg = ConvertToPetMessage(_spawnedPet);
+            Send(appear);
+            Send(petMsg);
+            _world.BroadcastToViewers(EntityId, appear, except: this);
+            _world.BroadcastToViewers(EntityId, petMsg, except: this);
             if (_spawnedPet.IsBoarding)
             {
                 Send(CurrentDisplay);
+                _world.BroadcastToViewers(EntityId, CurrentDisplay, except: this);
             }
         }
         Send(new WalletUpdated
@@ -175,11 +180,16 @@ public partial class ServerPlayer
             SendPetsInfo();
             if (_spawnedPet != null)
             {
-                Send(MakeAppearPet(_spawnedPet));
-                Send(ConvertToPetMessage(_spawnedPet));
+                AppearPet appear = MakeAppearPet(_spawnedPet);
+                Messages.Pet petMsg = ConvertToPetMessage(_spawnedPet);
+                Send(appear);
+                Send(petMsg);
+                _world.BroadcastToViewers(EntityId, appear, except: this);
+                _world.BroadcastToViewers(EntityId, petMsg, except: this);
                 if (_spawnedPet.IsBoarding)
                 {
                     Send(CurrentDisplay);
+                    _world.BroadcastToViewers(EntityId, CurrentDisplay, except: this);
                 }
             }
         }));
