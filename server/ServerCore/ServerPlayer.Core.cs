@@ -915,8 +915,10 @@ public partial class ServerPlayer
             float dx = moveDx;
             float dy = moveDy;
             float dist = moveDistance;
-            float maxSpeed = (_spawnedPet != null && _spawnedPet.IsBoarding) ? 1400f : MaxMoveSpeed;
-            float allowed = (float)(maxSpeed * dt) + MoveSlack;
+            float maxAllowedSpeed = (_spawnedPet != null && _spawnedPet.IsBoarding)
+                ? Math.Max(1400f, (_spawnedPet.Speed > 0 ? _spawnedPet.Speed : 750f) * 1.5f)
+                : MaxMoveSpeed;
+            float allowed = (float)(maxAllowedSpeed * dt) + MoveSlack;
             if (dist > allowed)
             {
                 // เกินนิดหน่อย (เน็ตกระตุกแล้ว client ส่ง Move ที่ค้างมาทีเดียว) = ไม่รับ move นี้เฉย ๆ

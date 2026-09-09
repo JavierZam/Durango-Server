@@ -136,4 +136,17 @@ public static class PetData
             p.TypeName.ToLowerInvariant().Contains(query) ||
             p.Name.ToLowerInvariant().Contains(query));
     }
+
+    public static float GetDefaultSpeed(ushort entityType)
+    {
+        var tmpl = FindByEntityType(entityType) ?? FindByVehicleEntityType(entityType);
+        if (tmpl == null) return 650f;
+        string sp = (tmpl.Species ?? string.Empty).ToLowerInvariant();
+        string tn = (tmpl.TypeName ?? string.Empty).ToLowerInvariant();
+        if (sp.Contains("ostrich") || sp.Contains("galli") || sp.Contains("struthio")) return 780f;
+        if (sp.Contains("raptor") || sp.Contains("deinon") || sp.Contains("smilodon") || tn.Contains("raptor")) return 750f;
+        if (sp.Contains("tarbo") || sp.Contains("trex") || sp.Contains("t-rex") || sp.Contains("tyranno") || sp.Contains("carnot")) return 680f;
+        if (sp.Contains("mammoth") || sp.Contains("elephant") || sp.Contains("stego") || sp.Contains("ankyl") || sp.Contains("brachio")) return 580f;
+        return 650f;
+    }
 }

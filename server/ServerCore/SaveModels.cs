@@ -393,6 +393,7 @@ public sealed class PetSave
     public float HungryMax { get; set; } = 100f;
     public float Stamina { get; set; } = 100f;
     public float StaminaMax { get; set; } = 100f;
+    public float Speed { get; set; } = 650f;
     public bool IsSpawned { get; set; }
     public bool IsBoarding { get; set; }
     public bool StayMode { get; set; }

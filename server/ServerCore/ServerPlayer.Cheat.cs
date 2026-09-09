@@ -504,7 +504,28 @@ public partial class ServerPlayer
                 return;
             }
 
-            SendCheatReply("Perintah pet: /pet list, /pet spawn <nama/nomor>, /pet return, /pet add <spesies> [level], /pet mount, /pet unmount, /pet stay, /pet follow, /pet feed", header);
+            if (sub == "speed")
+            {
+                if (_spawnedPet == null)
+                {
+                    SendCheatReply("Tidak ada pet yang aktif. Panggil pet dulu dengan /pet spawn.", header);
+                    return;
+                }
+                if (parts.Length < 3 || !float.TryParse(parts[2], out float spd))
+                {
+                    SendCheatReply($"Kecepatan pet {_spawnedPet.Name} saat ini: {_spawnedPet.Speed:F0}. Gunakan: /pet speed <nilai> (contoh: /pet speed 800)", header);
+                    return;
+                }
+                _spawnedPet.Speed = Math.Clamp(spd, 100f, 2500f);
+                var petMsg = ConvertToPetMessage(_spawnedPet);
+                Send(petMsg);
+                _world.BroadcastToViewers(EntityId, petMsg, except: this);
+                SendCheatReply($"Kecepatan pet {_spawnedPet.Name} diubah menjadi {_spawnedPet.Speed:F0}!", header);
+                MarkDirty();
+                return;
+            }
+
+            SendCheatReply("Perintah pet: /pet list, /pet spawn <nama/nomor>, /pet return, /pet add <spesies> [level], /pet mount, /pet unmount, /pet stay, /pet follow, /pet feed, /pet speed <nilai>", header);
             return;
         }
 

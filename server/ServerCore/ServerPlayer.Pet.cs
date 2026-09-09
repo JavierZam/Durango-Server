@@ -148,7 +148,7 @@ public partial class ServerPlayer
                 RequiredExp = Math.Max(100, pet.Level * 100),
                 DerivedAbilities = new Dictionary<Derived, float>
                 {
-                    [Derived.Speed] = 650f + (Math.Max(1, pet.Level) * 2.5f),
+                    [Derived.Speed] = pet.Speed > 0 ? pet.Speed : (PetData.GetDefaultSpeed(pet.EntityType) + (Math.Max(1, pet.Level) * 2.5f)),
                     [Derived.Attack] = 50f + (Math.Max(1, pet.Level) * 5f),
                     [Derived.Defense] = 20f + (Math.Max(1, pet.Level) * 2f),
                     [Derived.MaxHealth] = pet.LifeMax > 0 ? pet.LifeMax : 1000f,
@@ -159,7 +159,8 @@ public partial class ServerPlayer
                     [Derived.Accuracy] = 50f + Math.Max(1, pet.Level),
                     [Derived.Evade] = 20f + Math.Max(1, pet.Level),
                     [Derived.Critical] = 10f,
-                    [Derived.InventoryCapacity] = 10f
+                    [Derived.InventoryCapacity] = 30f,
+                    [Derived.LifeSpan] = 86400f * 365f
                 },
                 MilestonesInformation = Array.Empty<MilestoneInfo>(),
                 AvailableActiveSkill = Array.Empty<PetActiveSkill>()
@@ -462,6 +463,7 @@ public partial class ServerPlayer
             LifeMax = 100f,
             Hungry = 100f,
             HungryMax = 100f,
+            Speed = PetData.GetDefaultSpeed(petEntityType),
             IsSpawned = false,
             IsBoarding = false
         };
@@ -509,6 +511,7 @@ public partial class ServerPlayer
             LifeMax = 100f,
             Hungry = 100f,
             HungryMax = 100f,
+            Speed = PetData.GetDefaultSpeed(finalType),
             IsSpawned = false,
             IsBoarding = false
         };
