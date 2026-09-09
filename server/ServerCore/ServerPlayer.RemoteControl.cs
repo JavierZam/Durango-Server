@@ -219,15 +219,8 @@ public partial class ServerPlayer
     public string ControlHeal()
     {
         bool wasDead = Dead;
-        if (wasDead)
-        {
-            ReviveAtSpawn();
-        }
-        else
-        {
-            RestoreSurvival(clearFatigue: true);
-        }
-        return wasDead ? $"Membangkitkan {Name} (teleport ke titik spawn)" : $"Memulihkan darah/stamina/menghapus kelelahan {Name}";
+        ReviveHere(fullHeal: true);
+        return wasDead ? $"Membangkitkan {Name} seketika di tempat (darah & stamina penuh)" : $"Memulihkan darah/stamina/menghapus kelelahan {Name}";
     }
 
     /// <summary>เสกของทดสอบให้ผู้เล่นคนนั้น</summary>

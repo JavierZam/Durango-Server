@@ -358,7 +358,8 @@ public partial class ServerPlayer
     {
         if (!Dead)
         {
-            Send(Aborts.Reason(), header.Seq);
+            // ถ้าไม่ตายอยู่แล้ว (เช่น เพิ่ง /heal ไป) ส่ง Revived ปิด UI ให้เลย ไม่ส่ง Abort
+            Send(default(Revived), header.Seq);
             return;
         }
         ReviveAtSpawn();
@@ -367,24 +368,99 @@ public partial class ServerPlayer
     }
 
     /// <summary>
-    /// ฟื้นที่จุดเกิด — ส่วนที่ไม่เกี่ยวกับการตอบกลับ ใช้ร่วมกับคำสั่ง <c>control &lt;ชื่อ&gt; heal</c>
-    /// (แยกออกมาเพราะการฟื้นที่ admin สั่ง ไม่ควรส่ง <c>Revived</c> ซึ่งเป็น "คำตอบ" ของ packet
-    /// ที่ client ไม่เคยส่งมา — ReplyOf = 0 จะไปชนคีย์ reply ของ client)
+    /// ฟื้นที่จุดเกิด — ใช้กับการกดปุ่ม "귀환 후 부활" (Revive at Returning Point)
     /// </summary>
     public void ReviveAtSpawn()
     {
         Dead = false;
+        _hasDeathPoint = false;
+        MarkDirty();
         RestoreOnRevive();             // [TodoList/07] 60/40/20/10% ตามจำนวนครั้งที่ตายติดกัน
+
+        // แจ้ง EntityRevived ให้ Client ทราบก่อน เพื่อให้ IsAlive = true และยกเลิกสถานะตาย/หน้าจอมืด
+        _world.BroadcastToViewers(EntityId, new EntityRevived { EntityId = EntityId, At = Times.UnixTimeNow() });
+
         WorldPosition spawn = _returningPoint.HasValue
             ? new WorldPosition(_returningPoint.Value.x * 200f, _returningPoint.Value.y * 200f)
             : _world.GetEntryPosition();
-        SendTeleport(spawn, Shared.Teleport.TeleportType.Revive);
+
+        // ใช้ WarpBack แทน Revive เพื่อให้ Client เล่นท่า Warp_End และปิด loading curtain สมบูรณ์
+        SendTeleport(spawn, Shared.Teleport.TeleportType.WarpBack);
         RememberPosition(spawn, 0f);
         PushGauges("life", "stamina", "fatigue");
         Console.WriteLine("[combat] {0} ฟื้นที่จุดเกิด ({1},{2})", Name, (int)(spawn.x / 200f), (int)(spawn.y / 200f));
-        _world.BroadcastToViewers(EntityId, new EntityRevived { EntityId = EntityId, At = Times.UnixTimeNow() });
         SendSurvivalPublic();
+        Send(BuildPoints());
         PluginManager.Instance?.FireEvent("player.revived", this, false, true);
+    }
+
+    /// <summary>
+    /// ฟื้นชีพ ณ จุดเดิมทันที (In-place Revive) โดยไม่วาร์ป ไม่เกิด TeleportLoadingCurtain ค้าง
+    /// ใช้สำหรับคำสั่ง /heal, /revive, cheat, หรือ admin command
+    /// </summary>
+    public void ReviveHere(bool fullHeal = true)
+    {
+        bool wasDead = Dead;
+        Dead = false;
+        _hasDeathPoint = false;
+        MarkDirty();
+
+        if (fullHeal)
+        {
+            RestoreSurvival(clearFatigue: true);
+        }
+        else
+        {
+            RestoreOnRevive();
+        }
+
+        WorldPosition pos = CurrentPosition;
+        RememberPosition(pos, 0f);
+
+        if (wasDead)
+        {
+            // 1. แจ้งให้ Client ปลดสถานะตายทันที (IsAlive = true)
+            //    สิ่งนี้จะสั่ง UIManager.MessageBox.Hide(), คืนค่าสี NightEffect, ปิดเอฟเฟกต์ตาย
+            _world.BroadcastToViewers(EntityId, new EntityRevived { EntityId = EntityId, At = Times.UnixTimeNow() });
+
+            // 2. ส่ง Move เพื่อให้ตัวละครลุกขึ้นยืน (Barehand_Stand) ทันที
+            Move standMove = new Move
+            {
+                EntityId = EntityId,
+                Movements = new[]
+                {
+                    new Movement
+                    {
+                        MotionName = "Barehand_Stand",
+                        MotionOption = 34,
+                        PlaybackRate = 1f,
+                        RotSpeed = 540f,
+                        Path = new[]
+                        {
+                            new Location
+                            {
+                                Position = pos,
+                                Yaw = 0f,
+                                Time = Times.UnixTimeNow(),
+                                Floor = 0,
+                                Height = 0f
+                            }
+                        }
+                    }
+                }
+            };
+            Send(standMove);
+            _world.BroadcastToViewers(EntityId, standMove, except: this);
+
+            // 3. ส่ง Points อัปเดตเพื่อลบจุดหัวกะโหลกบนแผนที่
+            Send(BuildPoints());
+
+            Console.WriteLine("[combat] {0} ฟื้นชีพ ณ จุดเดิม ({1},{2})", Name, (int)(pos.x / 200f), (int)(pos.y / 200f));
+            PluginManager.Instance?.FireEvent("player.revived", this, false, true);
+        }
+
+        PushGauges("life", "stamina", "fatigue");
+        SendSurvivalPublic();
     }
 
     /// <summary>ส่งค่าสถานะให้ตัวเองและคนอื่น (ใช้หลังฟื้น เพื่อให้หลอดเลือดของทุกฝ่ายตรงกัน)</summary>

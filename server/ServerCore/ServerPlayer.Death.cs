@@ -78,17 +78,50 @@ public partial class ServerPlayer
     {
         if (!Dead)
         {
-            Send(Aborts.Reason(), header.Seq);
+            // ถ้าไม่ตายอยู่แล้ว (เช่น เพิ่ง /heal ไป) ส่ง Revived ปิด UI ให้เลย ไม่ส่ง Abort
+            Send(default(Revived), header.Seq);
             return;
         }
         Dead = false;
+        _hasDeathPoint = false;
         _immediateReviveCount++;
         // [TodoList/07] เกจตอนฟื้นตาม death_penalty (60/40/20/10%) — ปิด Death.Enabled = ฟื้นเต็ม+ล้างความล้าเหมือนเดิม
         RestoreOnRevive();
         MarkDirty();
         Send(default(Revived), header.Seq);
         _world.BroadcastToViewers(EntityId, new EntityRevived { EntityId = EntityId, At = Durango.Utils.Times.UnixTimeNow() });
+
+        WorldPosition pos = CurrentPosition;
+        Move standMove = new Move
+        {
+            EntityId = EntityId,
+            Movements = new[]
+            {
+                new Movement
+                {
+                    MotionName = "Barehand_Stand",
+                    MotionOption = 34,
+                    PlaybackRate = 1f,
+                    RotSpeed = 540f,
+                    Path = new[]
+                    {
+                        new Location
+                        {
+                            Position = pos,
+                            Yaw = 0f,
+                            Time = Durango.Utils.Times.UnixTimeNow(),
+                            Floor = 0,
+                            Height = 0f
+                        }
+                    }
+                }
+            }
+        };
+        Send(standMove);
+        _world.BroadcastToViewers(EntityId, standMove, except: this);
+
         SendSurvivalPublic();
+        Send(BuildPoints());
         QuestProgress(QuestData.Goal.Revive);
     }
 

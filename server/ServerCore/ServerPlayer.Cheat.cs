@@ -889,17 +889,13 @@ public partial class ServerPlayer
                 break;
             case "heal":
             case "revive":
-                // ฟื้นเต็ม + ล้างความล้า — ไว้ตั้งต้นบอทเทสให้สภาพเหมือนกันทุกรอบ
-                //
-                // 🐛 ที่ต้องมี: บอทเทสใช้ **ไฟล์เซฟเดิมทุกรอบ** (id คงที่อย่าง gp-check-1)
-                //    เจอมาแล้วว่าเซฟค้างที่เลือด 0.85 + ความล้า 87.5 (เกินขีดอันตราย = เลือดไม่ฟื้น)
-                //    ⇒ บอทตายกลางเทส แล้วเทสที่ต้องตีสัตว์/แตะซากตกยกแผงแบบสุ่ม ๆ
-                RestoreSurvival(clearFatigue: true);
-                if (Dead)
-                {
-                    ReviveAtSpawn();
-                }
-                SendCheatReply("Pulih sepenuhnya! Darah & stamina penuh, kelelahan 0.", header);
+                // ฟื้นชีพ ณ จุดเดิมทันที (In-place Revive) เลือด 100%, สตามินาเต็ม, ล้างความล้า 0
+                // ไม่วาร์ปไปจุดเกิด sn20snow / จุดอื่น ไม่ติด TeleportLoadingCurtain ค้าง
+                bool wasDead = Dead;
+                ReviveHere(fullHeal: true);
+                SendCheatReply(wasDead
+                    ? "Bangkit kembali & pulih sepenuhnya! Darah & stamina penuh, kelelahan 0."
+                    : "Pulih sepenuhnya! Darah & stamina penuh, kelelahan 0.", header);
                 break;
             case "peace":
             case "peaceful":
