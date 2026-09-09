@@ -88,7 +88,7 @@ public partial class ServerPlayer
             for (int i = 0; i < _inventory.Count; i++)
             {
                 Item it = _inventory[i];
-                if (it.Level > 1 && !string.IsNullOrEmpty(it.Prototype))
+                if (!string.IsNullOrEmpty(it.Prototype))
                 {
                     it.Tags = ItemTagData.For(it.Prototype, it.Level);
                     _inventory[i] = it;

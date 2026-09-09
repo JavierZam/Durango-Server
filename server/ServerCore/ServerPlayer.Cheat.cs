@@ -1694,7 +1694,7 @@ public partial class ServerPlayer
             for (int i = 0; i < _inventory.Count; i++)
             {
                 Item itm = _inventory[i];
-                if (itm.Level > 1 && !string.IsNullOrEmpty(itm.Prototype))
+                if (!string.IsNullOrEmpty(itm.Prototype))
                 {
                     itm.Tags = ItemTagData.For(itm.Prototype, itm.Level);
                     _inventory[i] = itm;
@@ -1838,6 +1838,14 @@ public partial class ServerPlayer
             itemsToAdd.Add((proto, name, icon, count, 60));
         }
 
+        if (recipeId == "blade_sword_metal_02" || recipeId == "blade_big_sword_metal_02")
+        {
+            if (!itemsToAdd.Any(x => x.proto == "bone_horn"))
+                itemsToAdd.Add(("bone_horn", "Trimmed Horn", "icon_nat_bone_horn_big", 3, 60));
+            if (!itemsToAdd.Any(x => x.proto == "bone_tooth"))
+                itemsToAdd.Add(("bone_tooth", "Trimmed Teeth", "icon_nat_bone_claw", 3, 60));
+        }
+
         string toolGiven = null;
         if (meta?.Tools != null && meta.Tools.Length > 0)
         {
@@ -1923,16 +1931,44 @@ public partial class ServerPlayer
 
     private static string ResolveSlotPrototype(RecipeRequirements.Slot slot)
     {
-        // 1. Cek Tags spesifik terlebih dahulu (seperti purity_high, rope_02, trim_bone, dll)
+        // 1. Cek Materials spesifik terlebih dahulu (seperti horn, tooth, rib, ivory)
+        if (slot.Materials != null && slot.Materials.Length > 0)
+        {
+            foreach (var mat in slot.Materials)
+            {
+                if (mat.Id == "horn") return "bone_horn";
+                if (mat.Id == "tooth") return "bone_tooth";
+                if (mat.Id == "rib") return "bone_rib";
+                if (mat.Id == "ivory") return "bone_ivory";
+            }
+        }
+
+        // 2. Cek Tags spesifik tingkat lanjut (seperti purity_high, rope_02, nail, smelted_metal)
         if (slot.Tags != null && slot.Tags.Length > 0)
         {
             foreach (var tag in slot.Tags)
             {
-                string mapped = MapTagToPrototype(tag.Id);
-                if (mapped != null && mapped != "stone") return mapped;
+                if (tag.Id == "purity_high") return "metal_purity";
+                if (tag.Id == "rope_02") return "rope_02";
+                if (tag.Id == "nail") return "nail_metal";
+                if (tag.Id == "smelted_metal") return "ingot_iron_01";
             }
         }
-        // 2. Cek Materials spesifik (seperti tooth, horn, nail, dll)
+
+        // 3. Jika slot membutuhkan trim_bone:
+        if (slot.Tags != null && slot.Tags.Any(t => t.Id == "trim_bone"))
+        {
+            if (slot.Materials != null)
+            {
+                if (slot.Materials.Any(m => m.Id == "horn")) return "bone_horn";
+                if (slot.Materials.Any(m => m.Id == "tooth")) return "bone_tooth";
+                if (slot.Materials.Any(m => m.Id == "rib")) return "bone_rib";
+                if (slot.Materials.Any(m => m.Id == "ivory")) return "bone_ivory";
+            }
+            return "bone_trim";
+        }
+
+        // 4. Cek Materials spesifik lainnya
         if (slot.Materials != null && slot.Materials.Length > 0)
         {
             foreach (var mat in slot.Materials)
@@ -1941,20 +1977,31 @@ public partial class ServerPlayer
                 if (mapped != null && mapped != "stone") return mapped;
             }
         }
-        // 3. Fallback jika semua adalah tag dasar/batu
+
+        // 5. Cek Tags spesifik lainnya
         if (slot.Tags != null && slot.Tags.Length > 0)
         {
             foreach (var tag in slot.Tags)
             {
                 string mapped = MapTagToPrototype(tag.Id);
+                if (mapped != null && mapped != "stone") return mapped;
+            }
+        }
+
+        // 6. Fallback jika semua adalah tag dasar/batu
+        if (slot.Materials != null && slot.Materials.Length > 0)
+        {
+            foreach (var mat in slot.Materials)
+            {
+                string mapped = MapTagToPrototype(mat.Id);
                 if (mapped != null) return mapped;
             }
         }
-        if (slot.Materials != null && slot.Materials.Length > 0)
+        if (slot.Tags != null && slot.Tags.Length > 0)
         {
-            foreach (var mat in slot.Materials)
+            foreach (var tag in slot.Tags)
             {
-                string mapped = MapTagToPrototype(mat.Id);
+                string mapped = MapTagToPrototype(tag.Id);
                 if (mapped != null) return mapped;
             }
         }
