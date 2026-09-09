@@ -449,7 +449,7 @@ public partial class ServerPlayer
         }
         else
         {
-            level = Math.Max(1, min);
+            level = InstantCraft ? Math.Max(min, Math.Min(Level, max > 0 ? max : Level)) : Math.Max(1, min);
         }
         if (max > 0 && level > max) { level = max; }
         if (level < min) { level = min; }
