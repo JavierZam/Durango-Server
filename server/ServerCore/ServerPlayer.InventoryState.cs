@@ -49,7 +49,7 @@ public partial class ServerPlayer
 
     private void HandleInventoryOrder(InventoryOrder msg, PacketHeader header)
     {
-        if (msg.TargetArtifact.HasValue || msg.ItemOrder == null || msg.ItemOrder.Length > PlayerInventoryMaxSize)
+        if (msg.TargetArtifact.HasValue || msg.ItemOrder == null || msg.ItemOrder.Length > InventoryMaxSize)
         {
             Send(Aborts.Reason(), header.Seq);
             return;
@@ -81,7 +81,7 @@ public partial class ServerPlayer
 
     private void HandleLockOrUnlockItems(LockOrUnlockItems msg, PacketHeader header)
     {
-        if (msg.ItemIds == null || msg.ItemIds.Length == 0 || msg.ItemIds.Length > PlayerInventoryMaxSize)
+        if (msg.ItemIds == null || msg.ItemIds.Length == 0 || msg.ItemIds.Length > InventoryMaxSize)
         {
             Send(Aborts.Reason(), header.Seq);
             return;
@@ -117,6 +117,14 @@ public partial class ServerPlayer
         {
             for (int i = 0; i < save.LockedItemIds.Count; i++) _lockedItemIds.Add(save.LockedItemIds[i]);
         }
+        if (save != null && save.InventoryMaxSize > 50)
+        {
+            InventoryMaxSize = Math.Clamp(save.InventoryMaxSize, 50, 1000);
+        }
+        else
+        {
+            InventoryMaxSize = DefaultInventoryMaxSize;
+        }
         CurrentInventoryOrder();
     }
 
@@ -124,5 +132,6 @@ public partial class ServerPlayer
     {
         save.InventoryOrder = new List<string>(CurrentInventoryOrder());
         save.LockedItemIds = new List<string>(_lockedItemIds);
+        save.InventoryMaxSize = InventoryMaxSize;
     }
 }

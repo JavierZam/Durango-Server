@@ -173,10 +173,12 @@ public partial class ServerPlayer
                 "• /god - Mode kebal (tidak bisa mati / kebal serangan)\n" +
                 "• /peace - Mode damai (dinosaurus tidak akan menyerang)\n" +
                 "• /instantcraft - Mode craft instan (munculkan meja serbaguna & bebas bahan)\n" +
-                "• /bench - Munculkan Meja Serbaguna (All-Round Workbench Lv. 60)\n" +
-                "• /mats - Isi tas dengan alat & bahan craft lengkap untuk Auto Fill di UI\n" +
+                "• /bench [kiln|table|kitchen|loom|all] - Munculkan Workbench Lv. 60 di depan pemain\n" +
+                "• /mats [resep] - Isi tas dengan alat & bahan craft lengkap (atau spesifik resep)\n" +
                 "• /craft <nama> [jumlah] [level] - Langsung buat item apapun tanpa UI\n" +
                 "• /craft all - Buka seluruh resep crafting & blueprint bangunan\n" +
+                "• /bag <jumlah> - Ubah kapasitas slot tas inventory (contoh: /bag 200, maks 1000)\n" +
+                "• /clearbag atau /bag clear - Kosongkan tas (item terkunci/locked tetap aman)\n" +
                 "• /sp <jumlah> - Tambahkan poin skill (SP)\n" +
                 "• /maxskills - Buka semua skill dan maksimalkan level & profisiensi (Lv. 60)\n" +
                 "• /maxprof - Maksimalkan seluruh profisiensi kategori ke Lv. 60\n" +
@@ -187,7 +189,6 @@ public partial class ServerPlayer
                 "• /give <nama_item> [jumlah] [level] - Dapatkan item apapun\n" +
                 "• /level <1-60> - Atur level karakter langsung\n" +
                 "• /money <jumlah> - Tambahkan DurangoCoin\n" +
-                "• /clearbag - Kosongkan seluruh tas inventory\n" +
                 "• /spawn <trex/raptor/pack/id> - Munculkan dinosaurus\n" +
                 "• /kill - Kalahkan dinosaurus terdekat\n" +
                 "• /tp <x> <y> /tp spawn /tp center - Teleportasi posisi\n" +
@@ -269,6 +270,41 @@ public partial class ServerPlayer
         if (cmd == "kill")
         {
             cmd = "kill animal";
+        }
+
+        if (cmd.StartsWith("bag", StringComparison.Ordinal) || cmd.StartsWith("slots", StringComparison.Ordinal))
+        {
+            string bagArgs = cmd.StartsWith("slots", StringComparison.Ordinal)
+                ? (cmd.Length <= 5 ? "" : cmd.Substring(5).Trim())
+                : (cmd.Length <= 3 ? "" : cmd.Substring(3).Trim());
+            HandleBagCommand(bagArgs, header);
+            return;
+        }
+
+        if (cmd.Equals("clearbag", StringComparison.Ordinal) || cmd.StartsWith("clearbag ", StringComparison.Ordinal) ||
+            cmd.Equals("clearinv", StringComparison.Ordinal) || cmd.StartsWith("clearinv ", StringComparison.Ordinal))
+        {
+            bool clearAll = cmd.Contains("all", StringComparison.Ordinal);
+            ClearInventory(clearAll, header);
+            return;
+        }
+
+        if (cmd.StartsWith("mats", StringComparison.Ordinal) || cmd.StartsWith("materials", StringComparison.Ordinal))
+        {
+            string matsArgs = cmd.StartsWith("materials", StringComparison.Ordinal)
+                ? (cmd.Length <= 9 ? "" : cmd.Substring(9).Trim())
+                : (cmd.Length <= 4 ? "" : cmd.Substring(4).Trim());
+            GiveCraftingKit(matsArgs, header);
+            return;
+        }
+
+        if (cmd.StartsWith("bench", StringComparison.Ordinal) || cmd.StartsWith("workbench", StringComparison.Ordinal))
+        {
+            string benchArgs = cmd.StartsWith("workbench", StringComparison.Ordinal)
+                ? (cmd.Length <= 9 ? "" : cmd.Substring(9).Trim())
+                : (cmd.Length <= 5 ? "" : cmd.Substring(5).Trim());
+            HandleBenchCommand(benchArgs, header);
+            return;
         }
 
         // รีโมทคุมตัวละครคนอื่น: control <ชื่อ|entityId> <คำสั่ง> [args]
@@ -830,8 +866,7 @@ public partial class ServerPlayer
             case "workbench":
             case "spawnbench":
             {
-                SpawnAllroundWorkbench(out string benchMsg);
-                SendCheatReply(benchMsg + "\n(Mendukung semua resep senjata, alat, baju, kiln, loom, masak Lv. 60)", header);
+                HandleBenchCommand("", header);
                 break;
             }
             case "delbench":
@@ -846,7 +881,19 @@ public partial class ServerPlayer
             case "kit craft":
             case "craftkit":
             {
-                GiveCraftingKit(header);
+                GiveCraftingKit("", header);
+                break;
+            }
+            case "bag":
+            case "slots":
+            {
+                HandleBagCommand("", header);
+                break;
+            }
+            case "clearbag":
+            case "clearinv":
+            {
+                ClearInventory(false, header);
                 break;
             }
             case "craft all":
@@ -1241,23 +1288,6 @@ public partial class ServerPlayer
                 break;
             }
 
-            // เททิ้งทั้งกระเป๋า — มีไว้ให้ชุดทดสอบเรียกตอนเริ่ม
-            // ไม่งั้นบอทชื่อเดิม (เช่น gp-check-1) สะสมของทุกรอบจนกระเป๋าเต็ม
-            // แล้วข้อที่ต้อง "เก็บของได้จริง" จะตกทั้งที่โค้ดถูก (เคยหลงแก้ผิดจุดมาแล้ว)
-            case "clearbag":
-            case "clear bag":
-            {
-                int before;
-                lock (_inventory)
-                {
-                    before = _inventory.Count;
-                    _inventory.Clear();
-                }
-                MarkDirty();
-                SendInventory();
-                SendCheatReply($"Berhasil mengosongkan {before} item dari tas inventory.", header);
-                break;
-            }
             // ล้าเต็มหลอด — ใช้เทสว่าเลือดไหลลงจนตายจริงไหม
             case "burnout":
                 SetGaugeValue("fatigue", ServerConfig.Current.Survival.FatigueMax);
@@ -1547,24 +1577,45 @@ public partial class ServerPlayer
         }
     }
 
-    public bool SpawnAllroundWorkbench(out string reply)
+    public bool SpawnWorkbench(string benchType, out string reply)
     {
         const string blueprintId = "allround";
+        string benchName = "Meja Serbaguna (All-Round Workbench Lv.60)";
+
         if (!RecipeData.BlueprintType.TryGetValue(blueprintId, out ushort entityType))
         {
             entityType = 8012;
         }
         Point2 tile = new Point2((int)(CurrentPosition.x / 200f), (int)(CurrentPosition.y / 200f));
-        for (int i = 0; i < 8 && _world.HasArtifactAt(tile); i++) { tile = new Point2(tile.x + 1, tile.y); }
+        Point2 targetTile = tile;
+        Point2[] offsets = { new(1, 0), new(0, 1), new(-1, 0), new(0, -1), new(1, 1), new(-1, -1), new(2, 0), new(0, 2) };
+        if (_world.HasArtifactAt(targetTile))
+        {
+            foreach (var off in offsets)
+            {
+                var cand = new Point2(tile.x + off.x, tile.y + off.y);
+                if (!_world.HasArtifactAt(cand))
+                {
+                    targetTile = cand;
+                    break;
+                }
+            }
+        }
+
         Point2 size = RecipeData.BlueprintSize.TryGetValue(blueprintId, out var bpSize)
             ? new Point2(bpSize.x, bpSize.y) : new Point2(1, 1);
         string entityId = Guid.NewGuid().ToString();
-        AppearArtifact placed = ArtifactFactory.Make(EntityId, entityId, entityType, tile, size,
+        AppearArtifact placed = ArtifactFactory.Make(EntityId, entityId, entityType, targetTile, size,
             default, null, 60, blueprintId, BuildingState.Completed);
         _world.AddArtifact(placed, blueprintId);
         _world.AnnounceArtifact(placed);
-        reply = $"Meja Serbaguna (All-Round Workbench Lv.60) dimunculkan di tile {tile.x},{tile.y}!";
+        reply = $"{benchName} berhasil dimunculkan di tile {targetTile.x},{targetTile.y} di sampingmu!\n(Mendukung Kiln, Table, Kitchen, Loom, dan semua resep Lv. 60)";
         return true;
+    }
+
+    public bool SpawnAllroundWorkbench(out string reply)
+    {
+        return SpawnWorkbench("allround", out reply);
     }
 
     public bool RemoveNearbyWorkbenches(out string reply)
@@ -1585,30 +1636,61 @@ public partial class ServerPlayer
         return true;
     }
 
-    private void GiveCraftingKit(PacketHeader header)
+    private void HandleBenchCommand(string args, PacketHeader header)
     {
+        string sub = (args ?? "").Trim().ToLowerInvariant();
+        if (sub == "del" || sub == "remove" || sub == "clear" || sub == "clean")
+        {
+            RemoveNearbyWorkbenches(out string delMsg);
+            SendCheatReply(delMsg, header);
+            return;
+        }
+        SpawnWorkbench(sub, out string benchMsg);
+        SendCheatReply(benchMsg, header);
+    }
+
+    private void GiveCraftingKit(string args, PacketHeader header)
+    {
+        string query = (args ?? "").Trim();
+        if (!string.IsNullOrEmpty(query) && !query.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            GiveRecipeMaterials(query, header);
+            return;
+        }
+
         var kitItems = new (string proto, string name, string icon, int count, int lv)[]
         {
+            // Alat Crafting Lengkap (Lv. 60)
             ("axe_tool_metal_01", "Work Axe Logam", "tool_axe_L01", 1, 60),
             ("sword_tool_metal_01", "Work Knife Logam", "tool_knife_L01", 1, 60),
             ("hammer_onehand_metal_01", "Palu Logam", "hammer_onehand_metal_01_blade", 1, 60),
             ("saw_metal_01", "Gergaji Logam", "weapon_saw_metal", 1, 60),
-            ("stone", "Batu", "icon_nat_mine_stone", 5, 60),
-            ("branch", "Ranting", "icon_nat_wood_branch", 5, 60),
-            ("log", "Batang Kayu", "icon_nat_wood_log", 5, 60),
-            ("bone_piece", "Tulang", "icon_nat_bone_piece", 5, 60),
-            ("blade_axe_stone_01", "Bilah Kapak Batu", "axe_twohand_stone_01_blade", 2, 60),
-            ("string_leather", "Tali Kulit", "material_string_leather", 5, 60),
-            ("leather_01", "Kulit Olahan", "material_leather_01", 5, 60),
-            ("ingot_iron_01", "Batang Besi", "material_ingot_iron", 5, 60),
-            ("leaf", "Daun", "icon_nat_leaf", 5, 60),
-            ("mud", "Tanah Liat", "icon_nat_mud", 5, 60)
+            ("pickaxe_metal_01", "Pickaxe Logam", "weapon_pickaxe_metal", 1, 60),
+
+            // Material Tingkat Lanjut (Lv. 60)
+            ("metal_purity", "High Purity Metal", "material_metal_purity", 10, 60),
+            ("bone_horn", "Trimmed Horn", "icon_nat_bone_horn_big", 10, 60),
+            ("rope_02", "Cord (Tali Tambang)", "recipe_twist_rope", 10, 60),
+            ("bone_trim", "Trimmed Bone", "icon_nat_bone", 10, 60),
+            ("bone_process", "Processed Bone", "icon_nat_bone", 10, 60),
+            ("ingot_iron_01", "Batang Besi", "material_ingot_iron", 10, 60),
+            ("leather_01", "Kulit Olahan", "material_leather_01", 10, 60),
+            ("string_leather", "Tali Kulit", "material_string_leather", 10, 60),
+            ("nail_metal", "Paku Logam", "nail_metal", 10, 60),
+
+            // Material Dasar (Lv. 60)
+            ("stone", "Batu", "icon_nat_mine_stone", 10, 60),
+            ("branch", "Ranting", "icon_nat_wood_branch", 10, 60),
+            ("log", "Batang Kayu", "icon_nat_wood_log", 10, 60),
+            ("bone_piece", "Tulang", "icon_nat_bone_piece", 10, 60),
+            ("leaf", "Daun", "icon_nat_leaf", 10, 60),
+            ("mud", "Tanah Liat", "icon_nat_mud", 10, 60)
         };
 
         int room = FreeInventorySlots();
         if (room <= 0)
         {
-            SendCheatReply("Tas inventory penuh! Kosongkan sebagian slot tas terlebih dahulu.", header);
+            SendCheatReply($"Tas inventory penuh ({_inventory.Count}/{InventoryMaxSize})! Kosongkan tas dengan /clearbag atau perbesar dengan /bag 200.", header);
             return;
         }
 
@@ -1617,8 +1699,8 @@ public partial class ServerPlayer
         {
             foreach (var it in kitItems)
             {
-                if (_inventory.Count >= PlayerInventoryMaxSize) break;
-                for (int i = 0; i < it.count && _inventory.Count < PlayerInventoryMaxSize; i++)
+                if (_inventory.Count >= InventoryMaxSize) break;
+                for (int i = 0; i < it.count && _inventory.Count < InventoryMaxSize; i++)
                 {
                     _inventory.Add(MakeCraftedItem(it.proto, it.name, it.icon, it.lv));
                     added++;
@@ -1627,7 +1709,372 @@ public partial class ServerPlayer
         }
         MarkDirty();
         SendInventory();
-        SendCheatReply($"Berhasil menambahkan {added} alat & bahan crafting ke tas!\n(Work Axe, Work Knife, Palu, Gergaji, Batu, Kayu, Tulang, Tali, Besi Lv. 60)\nSekarang kamu bisa gunakan tombol 'Auto Fill' di menu Craft!", header);
+        SendCheatReply($"Berhasil menambahkan {added} alat & bahan crafting ke tas!\n" +
+                       $"• Alat: Work Axe, Work Knife, Palu, Gergaji, Pickaxe (Lv. 60)\n" +
+                       $"• Bahan: High Purity Metal, Horn, Cord, Besi, Kulit, Tulang, Kayu, Batu\n" +
+                       $"• Kamu juga bisa request bahan resep spesifik: /mats <nama_resep> (contoh: /mats razor)\n" +
+                       $"• Sekarang kamu bisa tekan tombol 'Auto Fill' di menu Craft!", header);
+    }
+
+    private void GiveRecipeMaterials(string query, PacketHeader header)
+    {
+        string recipeId = null;
+
+        if (RecipeRequirements.Recipes.ContainsKey(query))
+        {
+            recipeId = query;
+        }
+        else if (RecipeMeta.Map.ContainsKey(query))
+        {
+            recipeId = query;
+        }
+        else
+        {
+            foreach (var key in RecipeRequirements.Recipes.Keys)
+            {
+                if (key.Equals(query, StringComparison.OrdinalIgnoreCase))
+                {
+                    recipeId = key;
+                    break;
+                }
+            }
+            if (recipeId == null)
+            {
+                foreach (var key in RecipeRequirements.Recipes.Keys)
+                {
+                    if (key.Contains(query, StringComparison.OrdinalIgnoreCase))
+                    {
+                        recipeId = key;
+                        break;
+                    }
+                }
+            }
+            if (recipeId == null)
+            {
+                foreach (var kvp in RecipeData.RecipeInfo)
+                {
+                    if (kvp.Key.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                        kvp.Value.name.Contains(query, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (RecipeRequirements.Recipes.ContainsKey(kvp.Key))
+                        {
+                            recipeId = kvp.Key;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (recipeId == null || !RecipeRequirements.TryGet(recipeId, out RecipeRequirements.Slot[] slots))
+        {
+            SendCheatReply($"Resep '{query}' tidak ditemukan. Gunakan /mats untuk kit lengkap atau /craft <item> untuk buat langsung.", header);
+            return;
+        }
+
+        RecipeMeta.TryGet(recipeId, out RecipeMeta.Info meta);
+        string recipeDisplayName = recipeId;
+        if (RecipeData.RecipeInfo.TryGetValue(recipeId, out var rInfo))
+        {
+            recipeDisplayName = rInfo.name;
+        }
+
+        var itemsToAdd = new List<(string proto, string name, string icon, int count, int lv)>();
+
+        foreach (var slot in slots)
+        {
+            int count = Math.Max(1, slot.Max > 0 ? slot.Max : slot.Min);
+            string proto = ResolveSlotPrototype(slot);
+            if (string.IsNullOrEmpty(proto))
+            {
+                proto = "stone";
+            }
+            string name = ItemNameData.NameOf(proto, proto);
+            string icon = ItemNameData.IconOf(proto, string.Empty);
+            itemsToAdd.Add((proto, name, icon, count, 60));
+        }
+
+        string toolGiven = null;
+        if (meta?.Tools != null && meta.Tools.Length > 0)
+        {
+            foreach (var needTool in meta.Tools)
+            {
+                if (needTool.Id == "bare_hands") continue;
+                string toolProto = ResolveToolPrototype(needTool.Id);
+                if (!string.IsNullOrEmpty(toolProto))
+                {
+                    bool hasTool = false;
+                    lock (_inventory)
+                    {
+                        for (int j = 0; j < _inventory.Count; j++)
+                        {
+                            if (ItemTagData.LevelOf(_inventory[j].Prototype, needTool.Id) > 0)
+                            {
+                                hasTool = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!hasTool)
+                    {
+                        string tName = ItemNameData.NameOf(toolProto, toolProto);
+                        string tIcon = ItemNameData.IconOf(toolProto, string.Empty);
+                        itemsToAdd.Add((toolProto, tName, tIcon, 1, 60));
+                        toolGiven = tName;
+                    }
+                }
+            }
+        }
+
+        string benchMsg = null;
+        if (meta?.Workbench != null && meta.Workbench.Length > 0)
+        {
+            SpawnAllroundWorkbench(out benchMsg);
+        }
+
+        int totalItems = 0;
+        foreach (var it in itemsToAdd) totalItems += it.count;
+
+        if (FreeInventorySlots() < totalItems)
+        {
+            if (InventoryMaxSize < 1000)
+            {
+                InventoryMaxSize = Math.Min(1000, _inventory.Count + totalItems + 50);
+                MarkDirty();
+            }
+        }
+
+        int added = 0;
+        var addedNames = new List<string>();
+        lock (_inventory)
+        {
+            foreach (var it in itemsToAdd)
+            {
+                for (int i = 0; i < it.count && _inventory.Count < InventoryMaxSize; i++)
+                {
+                    _inventory.Add(MakeCraftedItem(it.proto, it.name, it.icon, it.lv));
+                    added++;
+                }
+                addedNames.Add($"{it.name} x{it.count}");
+            }
+        }
+
+        MarkDirty();
+        SendInventory();
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"Bahan untuk resep '{recipeDisplayName}' ({recipeId}):");
+        sb.AppendLine($"• Material: {string.Join(", ", addedNames)}");
+        if (!string.IsNullOrEmpty(toolGiven))
+        {
+            sb.AppendLine($"• Alat: {toolGiven} (Lv. 60) ditambahkan ke tas");
+        }
+        if (!string.IsNullOrEmpty(benchMsg))
+        {
+            sb.AppendLine($"• Workbench: {benchMsg}");
+        }
+        sb.AppendLine("Sekarang kamu bisa buka menu Crafting dan klik 'Auto Fill'!");
+        SendCheatReply(sb.ToString().TrimEnd(), header);
+    }
+
+    private static string ResolveSlotPrototype(RecipeRequirements.Slot slot)
+    {
+        if (slot.Materials != null && slot.Materials.Length > 0)
+        {
+            foreach (var mat in slot.Materials)
+            {
+                string mapped = MapTagToPrototype(mat.Id);
+                if (mapped != null) return mapped;
+            }
+        }
+        if (slot.Tags != null && slot.Tags.Length > 0)
+        {
+            foreach (var tag in slot.Tags)
+            {
+                string mapped = MapTagToPrototype(tag.Id);
+                if (mapped != null) return mapped;
+            }
+        }
+        return "stone";
+    }
+
+    private static string MapTagToPrototype(string tag)
+    {
+        if (string.IsNullOrEmpty(tag)) return null;
+        switch (tag)
+        {
+            case "purity_high": return "metal_purity";
+            case "horn": return "bone_horn";
+            case "trim_bone": return "bone_trim";
+            case "bone": return "bone_piece";
+            case "rope_02": return "rope_02";
+            case "rope": return "rope";
+            case "string_long":
+            case "string_normal":
+            case "string_short":
+            case "leather_string": return "string_leather";
+            case "wood":
+            case "log": return "log";
+            case "stick":
+            case "stick_long":
+            case "stick_normal":
+            case "stick_short": return "branch";
+            case "stone":
+            case "chunk_big":
+            case "chunk_normal":
+            case "chunk_small": return "stone";
+            case "trim_wood":
+            case "board_trim_01": return "board_wood";
+            case "trim_stone": return "board_stone";
+            case "metal":
+            case "iron":
+            case "smelted_metal": return "ingot_iron_01";
+            case "nail": return "nail_metal";
+            case "blade":
+            case "blade_axe":
+            case "blade_sword": return "blade_axe_stone_01";
+            case "blade_big":
+            case "blade_axe_big":
+            case "blade_sword_big": return "blade_big_sword_metal_02";
+            case "dried_leather":
+            case "leather": return "leather_01";
+            case "leaf": return "leaf";
+            case "mud": return "mud";
+            case "meat":
+            case "raw_meat": return "meat";
+            case "tooth": return "bone_tooth";
+            case "rib": return "bone_rib";
+            case "handle":
+            case "handle_02":
+            case "handle_03": return "handle";
+            case "bowstick": return "bowstick_wooden_01";
+            case "crossstick": return "crossstick_metal_01";
+            case "bowstring_01":
+            case "bowstring_02": return "bowstring_01";
+            case "weapon_connection":
+            case "metal_connection":
+            case "metal_set": return "nail_metal";
+            default:
+                if (ItemNameData.Map.ContainsKey(tag)) return tag;
+                foreach (var kvp in ItemTagData.Map)
+                {
+                    if (ItemTagData.LevelOf(kvp.Key, tag) > 0) return kvp.Key;
+                }
+                return null;
+        }
+    }
+
+    private static string ResolveToolPrototype(string toolTag)
+    {
+        switch (toolTag)
+        {
+            case "axe":
+            case "axe_onehand":
+            case "axe_tool": return "axe_tool_metal_01";
+            case "knife":
+            case "sword_tool":
+            case "sword_onehand": return "sword_tool_metal_01";
+            case "hammer":
+            case "hammer_onehand": return "hammer_onehand_metal_01";
+            case "saw": return "saw_metal_01";
+            case "pick":
+            case "pickaxe": return "pickaxe_metal_01";
+            default:
+                foreach (var kvp in ItemTagData.Map)
+                {
+                    if (ItemTagData.LevelOf(kvp.Key, toolTag) > 0) return kvp.Key;
+                }
+                return "hammer_onehand_metal_01";
+        }
+    }
+
+    private void HandleBagCommand(string args, PacketHeader header)
+    {
+        string trimmed = (args ?? "").Trim();
+        if (string.IsNullOrEmpty(trimmed) || trimmed.Equals("info", StringComparison.OrdinalIgnoreCase))
+        {
+            int lockedCount = 0;
+            lock (_inventory)
+            {
+                for (int i = 0; i < _inventory.Count; i++)
+                {
+                    if (IsItemLocked(_inventory[i].Id)) lockedCount++;
+                }
+            }
+            SendCheatReply($"Kapasitas tas saat ini: {_inventory.Count}/{InventoryMaxSize} slot (Terkunci: {lockedCount})\n" +
+                           $"• Gunakan /bag <jumlah> untuk mengubah kapasitas (contoh: /bag 200, maks 1000)\n" +
+                           $"• Gunakan /bag clear atau /clearbag untuk mengosongkan tas (item terkunci tetap aman)\n" +
+                           $"• Gunakan /bag clear all untuk mengosongkan seluruh tas termasuk item terkunci", header);
+            return;
+        }
+
+        if (trimmed.StartsWith("clear", StringComparison.OrdinalIgnoreCase))
+        {
+            bool clearAll = trimmed.Contains("all", StringComparison.OrdinalIgnoreCase);
+            ClearInventory(clearAll, header);
+            return;
+        }
+
+        if (trimmed.Equals("max", StringComparison.OrdinalIgnoreCase))
+        {
+            InventoryMaxSize = 1000;
+            MarkDirty();
+            SendInventory();
+            SendCheatReply($"Kapasitas tas dimaksimalkan menjadi {InventoryMaxSize} slot!", header);
+            return;
+        }
+
+        if (int.TryParse(trimmed, out int wantSlots))
+        {
+            int clamped = Math.Clamp(wantSlots, 50, 1000);
+            if (clamped < _inventory.Count)
+            {
+                SendCheatReply($"Kapasitas tidak bisa diatur lebih kecil dari jumlah item yang ada saat ini ({_inventory.Count} item). Buang atau kosongkan tas terlebih dahulu.", header);
+                return;
+            }
+            InventoryMaxSize = clamped;
+            MarkDirty();
+            SendInventory();
+            SendCheatReply($"Kapasitas tas berhasil diubah menjadi {InventoryMaxSize} slot!", header);
+            return;
+        }
+
+        SendCheatReply("Perintah /bag tidak valid. Gunakan: /bag <jumlah> (contoh: /bag 200), /bag max, /bag clear, atau /bag info", header);
+    }
+
+    private void ClearInventory(bool clearAll, PacketHeader header)
+    {
+        int removed = 0;
+        int keptLocked = 0;
+        var removedIds = new List<string>();
+        lock (_inventory)
+        {
+            for (int i = _inventory.Count - 1; i >= 0; i--)
+            {
+                var it = _inventory[i];
+                if (!clearAll && IsItemLocked(it.Id))
+                {
+                    keptLocked++;
+                    continue;
+                }
+                removedIds.Add(it.Id);
+                _inventory.RemoveAt(i);
+                ForgetInventoryItem(it.Id);
+                removed++;
+            }
+        }
+        MarkDirty();
+        if (removedIds.Count > 0)
+        {
+            Send(new InventoryUpdated { EntityId = EntityId, RemovedItemIds = removedIds.ToArray() });
+        }
+        SendInventory();
+        string reply = $"Berhasil mengosongkan {removed} item dari tas.";
+        if (keptLocked > 0)
+        {
+            reply += $" ({keptLocked} item terkunci/locked tetap disimpan aman)";
+        }
+        SendCheatReply(reply, header);
     }
 
     private void HandleDirectCraft(string args, PacketHeader header)

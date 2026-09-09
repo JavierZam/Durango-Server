@@ -249,6 +249,8 @@ public sealed class PlayerSave : SaveEnvelope
     public List<ItemSave> Inventory { get; set; } = new List<ItemSave>();
     public List<string> InventoryOrder { get; set; } = new List<string>();
     public List<string> LockedItemIds { get; set; } = new List<string>();
+    /// <summary>Kapasitas maksimal tas pemain (default 200, dapat diperbesar via /bag)</summary>
+    public int InventoryMaxSize { get; set; } = 200;
     public List<SkillBundleSave> KnownSkills { get; set; } = new List<SkillBundleSave>();
 
     /// <summary>ได้ของแถมตอนเข้าเกมครั้งแรกไปแล้วหรือยัง (กันแจกกองไฟซ้ำทุก login)</summary>

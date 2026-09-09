@@ -193,7 +193,7 @@ public partial class ServerPlayer
         int free;
         lock (_inventory)
         {
-            free = PlayerInventoryMaxSize - _inventory.Count;
+            free = InventoryMaxSize - _inventory.Count;
         }
         if (free <= 0)
         {

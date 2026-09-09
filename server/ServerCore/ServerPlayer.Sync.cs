@@ -33,12 +33,14 @@ namespace DurangoServer.Core;
 
 public partial class ServerPlayer
 {
-    /// <summary>ความจุกระเป๋าผู้เล่น (กล่องเก็บของคือ BoxMaxSize ดู ServerPlayer.Storage.cs)</summary>
-    private const int PlayerInventoryMaxSize = 50;
+    /// <summary>Kapasitas tas default (sebelumnya 50, kini 200 slot)</summary>
+    public const int DefaultInventoryMaxSize = 200;
+
+    /// <summary>Kapasitas maksimal tas pemain saat ini (dapat diubah via /bag)</summary>
+    public int InventoryMaxSize { get; set; } = DefaultInventoryMaxSize;
 
     /// <summary>
-    /// กระเป๋าเต็มไหม — เจอตอนรัน FarmBot: Collect/Craft เดิมไม่เช็คความจุเลย
-    /// ทำให้ของทะลุ MaxSize ที่ประกาศไว้ (bot เก็บจนได้ 52 ชิ้นทั้งที่ MaxSize = 50)
+    /// กระเป๋าเต็มไหม — ตรวจสอบตาม InventoryMaxSize ปัจจุบัน
     /// </summary>
     private bool InventoryFull
     {
@@ -46,7 +48,7 @@ public partial class ServerPlayer
         {
             lock (_inventory)
             {
-                return _inventory.Count >= PlayerInventoryMaxSize;
+                return _inventory.Count >= InventoryMaxSize;
             }
         }
     }
@@ -63,7 +65,7 @@ public partial class ServerPlayer
         {
             lock (_inventory)
             {
-                return $"กระเป๋าเต็ม ({_inventory.Count}/{PlayerInventoryMaxSize} ช่อง) — ทิ้งหรือฝากของเข้าโกดังอย่างน้อย 1 ชิ้นก่อนถึงจะเก็บเพิ่มได้";
+                return $"Tas penuh ({_inventory.Count}/{InventoryMaxSize} slot) — buang atau simpan sebagian barang terlebih dahulu!";
             }
         }
     }
@@ -213,7 +215,7 @@ public partial class ServerPlayer
                 InventoryInfos = new InventoryInfos
                 {
                     EntityId = EntityId,
-                    MaxSize = PlayerInventoryMaxSize,
+                    MaxSize = InventoryMaxSize,
                     LockedItemIds = CurrentProtectedItems().ItemIds,
                     ItemOrder = CurrentInventoryOrder(),
                     ProtectedItems = CurrentProtectedItems()

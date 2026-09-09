@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Durango.Network;
 using Messages;
@@ -283,9 +283,9 @@ public partial class ServerPlayer
             {
                 lock (_inventory)
                 {
-                    if (_inventory.Count >= PlayerInventoryMaxSize)
+                    if (_inventory.Count >= InventoryMaxSize)
                     {
-                        Send(new Info { Text = "กระเป๋าเต็ม — ของรางวัลบางส่วนตกหล่น" });
+                        Send(new Info { Text = "Tas penuh — sebagian hadiah tidak dapat diambil" });
                         break;
                     }
                     _inventory.Add(MakeGatheredItem(new Generator

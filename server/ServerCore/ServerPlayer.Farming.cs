@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Durango.Network;
 using Shared.Item;
@@ -383,7 +383,7 @@ public partial class ServerPlayer
             {
                 lock (_inventory)
                 {
-                    if (_inventory.Count >= PlayerInventoryMaxSize)
+                    if (_inventory.Count >= InventoryMaxSize)
                     {
                         break;
                     }

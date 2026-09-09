@@ -322,7 +322,7 @@ public partial class ServerPlayer
     {
         lock (_inventory)
         {
-            return Math.Max(0, PlayerInventoryMaxSize - _inventory.Count);
+            return Math.Max(0, InventoryMaxSize - _inventory.Count);
         }
     }
 

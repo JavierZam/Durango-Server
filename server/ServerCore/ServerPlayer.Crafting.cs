@@ -336,8 +336,8 @@ public partial class ServerPlayer
                     {
                         continue;           // client ระบุชิ้นไหนมา ก็ตรวจชิ้นนั้น
                     }
-                    if (ItemTagData.LevelOf(it.Prototype, need[i].Id) >= need[i].Level
-                        && CraftToolTierOf(it.Prototype) >= wantTier)
+                    if (ItemTagData.LevelOf(it.Prototype, need[i].Id) > 0
+                        && (it.Level >= need[i].Level || CraftToolTierOf(it.Prototype) >= wantTier))
                     {
                         usedToolId = it.Id;
                         return true;
@@ -998,7 +998,7 @@ public partial class ServerPlayer
         {
             inventoryCount = _inventory.Count;
         }
-        if (inventoryCount - materialIds.Count + outputCount > PlayerInventoryMaxSize)
+        if (inventoryCount - materialIds.Count + outputCount > InventoryMaxSize)
         {
             Console.WriteLine("[inventory] {0} กระเป๋าไม่มีพื้นที่พอสำหรับผลลัพธ์", Name);
             Send(Aborts.Reason(), header.Seq);
