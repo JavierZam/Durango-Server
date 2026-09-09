@@ -130,7 +130,7 @@ public sealed class ItemSave
             RepairRequirement = ToolDurability.RepairRequirementFor(Prototype),
             FounderId = null,
             FounderCategory = null,
-            Tags = Processed ? ItemProcessing.ProcessedTags(Prototype) : ItemTagData.For(Prototype),
+            Tags = Processed ? ItemProcessing.ProcessedTags(Prototype, Level) : ItemTagData.For(Prototype, Level),
             TagModifications = null,
             // แนบช่องที่ใส่ได้ไปด้วย ไม่งั้น client กดใส่อุปกรณ์ไม่ได้ (ดู EquipData.PerformanceFor)
             Performance = EquipData.PerformanceFor(Prototype),

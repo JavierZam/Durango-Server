@@ -1669,6 +1669,7 @@ public partial class ServerPlayer
 
             // Material Tingkat Lanjut (Lv. 60)
             ("metal_purity", "High Purity Metal", "material_metal_purity", 10, 60),
+            ("bone_tooth", "Trimmed Teeth", "icon_nat_bone_claw", 10, 60),
             ("bone_horn", "Trimmed Horn", "icon_nat_bone_horn_big", 10, 60),
             ("rope_02", "Cord (Tali Tambang)", "recipe_twist_rope", 10, 60),
             ("bone_trim", "Trimmed Bone", "icon_nat_bone", 10, 60),
@@ -1687,11 +1688,27 @@ public partial class ServerPlayer
             ("mud", "Tanah Liat", "icon_nat_mud", 10, 60)
         };
 
-        int room = FreeInventorySlots();
-        if (room <= 0)
+        // Perbarui semua tag item yang ada di inventory agar sesuai dengan levelnya (cegah Insufficient item level)
+        lock (_inventory)
         {
-            SendCheatReply($"Tas inventory penuh ({_inventory.Count}/{InventoryMaxSize})! Kosongkan tas dengan /clearbag atau perbesar dengan /bag 200.", header);
-            return;
+            for (int i = 0; i < _inventory.Count; i++)
+            {
+                Item itm = _inventory[i];
+                if (itm.Level > 1 && !string.IsNullOrEmpty(itm.Prototype))
+                {
+                    itm.Tags = ItemTagData.For(itm.Prototype, itm.Level);
+                    _inventory[i] = itm;
+                }
+            }
+        }
+
+        int totalNeeded = 0;
+        foreach (var it in kitItems) totalNeeded += it.count;
+
+        if (FreeInventorySlots() < totalNeeded && InventoryMaxSize < 1000)
+        {
+            InventoryMaxSize = Math.Min(1000, _inventory.Count + totalNeeded + 50);
+            MarkDirty();
         }
 
         int added = 0;
@@ -1707,64 +1724,91 @@ public partial class ServerPlayer
                 }
             }
         }
+
+        SpawnAllroundWorkbench(out string benchMsg);
+
         MarkDirty();
         SendInventory();
         SendCheatReply($"Berhasil menambahkan {added} alat & bahan crafting ke tas!\n" +
                        $"• Alat: Work Axe, Work Knife, Palu, Gergaji, Pickaxe (Lv. 60)\n" +
-                       $"• Bahan: High Purity Metal, Horn, Cord, Besi, Kulit, Tulang, Kayu, Batu\n" +
+                       $"• Bahan: High Purity Metal, Trimmed Teeth, Horn, Cord, Besi, Kulit, Tulang, Kayu, Batu\n" +
+                       $"• Workbench: {benchMsg}\n" +
                        $"• Kamu juga bisa request bahan resep spesifik: /mats <nama_resep> (contoh: /mats razor)\n" +
                        $"• Sekarang kamu bisa tekan tombol 'Auto Fill' di menu Craft!", header);
     }
 
-    private void GiveRecipeMaterials(string query, PacketHeader header)
+    private static readonly Dictionary<string, string> RecipeAliases = new(StringComparer.OrdinalIgnoreCase)
     {
-        string recipeId = null;
+        { "razor", "blade_sword_metal_02" },
+        { "razor blade", "blade_sword_metal_02" },
+        { "giant razor", "blade_sword_metal_02" },
+        { "giant razor blade", "blade_sword_metal_02" },
+        { "razor_blade", "blade_sword_metal_02" },
+        { "giant_razor", "blade_sword_metal_02" },
+        { "giant_razor_blade", "blade_sword_metal_02" },
+        { "blade_sword_metal_02", "blade_sword_metal_02" },
+        { "big razor", "blade_big_sword_metal_02" },
+        { "large razor", "blade_big_sword_metal_02" },
+        { "large giant razor", "blade_big_sword_metal_02" },
+        { "blade_big_sword_metal_02", "blade_big_sword_metal_02" },
+        { "razor sword", "sword_metal_02" },
+        { "giant razor sword", "sword_metal_02" },
+        { "sword_metal_02", "sword_metal_02" },
+        { "big razor sword", "big_sword_metal_02" },
+        { "big_sword_metal_02", "big_sword_metal_02" },
+        { "axe", "axe_onehand_metal_01" },
+        { "workaxe", "axe_tool_metal_01" },
+        { "knife", "sword_tool_metal_01" },
+        { "workknife", "sword_tool_metal_01" },
+        { "hammer", "hammer_onehand_metal_01" },
+        { "saw", "saw_metal_01" },
+        { "pickaxe", "pickaxe_metal_01" },
+    };
+
+    private static string ResolveRecipeId(string query)
+    {
+        if (string.IsNullOrEmpty(query)) return null;
+        query = query.Trim();
+
+        if (RecipeAliases.TryGetValue(query, out string alias))
+        {
+            return alias;
+        }
 
         if (RecipeRequirements.Recipes.ContainsKey(query))
         {
-            recipeId = query;
+            return query;
         }
-        else if (RecipeMeta.Map.ContainsKey(query))
+        if (RecipeMeta.Map.ContainsKey(query))
         {
-            recipeId = query;
+            return query;
         }
-        else
+
+        foreach (var key in RecipeRequirements.Recipes.Keys)
         {
-            foreach (var key in RecipeRequirements.Recipes.Keys)
+            if (key.Equals(query, StringComparison.OrdinalIgnoreCase))
+                return key;
+        }
+        foreach (var key in RecipeRequirements.Recipes.Keys)
+        {
+            if (key.Contains(query, StringComparison.OrdinalIgnoreCase))
+                return key;
+        }
+        foreach (var kvp in RecipeData.RecipeInfo)
+        {
+            if (kvp.Key.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                kvp.Value.name.Contains(query, StringComparison.OrdinalIgnoreCase))
             {
-                if (key.Equals(query, StringComparison.OrdinalIgnoreCase))
-                {
-                    recipeId = key;
-                    break;
-                }
-            }
-            if (recipeId == null)
-            {
-                foreach (var key in RecipeRequirements.Recipes.Keys)
-                {
-                    if (key.Contains(query, StringComparison.OrdinalIgnoreCase))
-                    {
-                        recipeId = key;
-                        break;
-                    }
-                }
-            }
-            if (recipeId == null)
-            {
-                foreach (var kvp in RecipeData.RecipeInfo)
-                {
-                    if (kvp.Key.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                        kvp.Value.name.Contains(query, StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (RecipeRequirements.Recipes.ContainsKey(kvp.Key))
-                        {
-                            recipeId = kvp.Key;
-                            break;
-                        }
-                    }
-                }
+                if (RecipeRequirements.Recipes.ContainsKey(kvp.Key))
+                    return kvp.Key;
             }
         }
+        return null;
+    }
+
+    private void GiveRecipeMaterials(string query, PacketHeader header)
+    {
+        string recipeId = ResolveRecipeId(query);
 
         if (recipeId == null || !RecipeRequirements.TryGet(recipeId, out RecipeRequirements.Slot[] slots))
         {
@@ -1879,19 +1923,38 @@ public partial class ServerPlayer
 
     private static string ResolveSlotPrototype(RecipeRequirements.Slot slot)
     {
-        if (slot.Materials != null && slot.Materials.Length > 0)
-        {
-            foreach (var mat in slot.Materials)
-            {
-                string mapped = MapTagToPrototype(mat.Id);
-                if (mapped != null) return mapped;
-            }
-        }
+        // 1. Cek Tags spesifik terlebih dahulu (seperti purity_high, rope_02, trim_bone, dll)
         if (slot.Tags != null && slot.Tags.Length > 0)
         {
             foreach (var tag in slot.Tags)
             {
                 string mapped = MapTagToPrototype(tag.Id);
+                if (mapped != null && mapped != "stone") return mapped;
+            }
+        }
+        // 2. Cek Materials spesifik (seperti tooth, horn, nail, dll)
+        if (slot.Materials != null && slot.Materials.Length > 0)
+        {
+            foreach (var mat in slot.Materials)
+            {
+                string mapped = MapTagToPrototype(mat.Id);
+                if (mapped != null && mapped != "stone") return mapped;
+            }
+        }
+        // 3. Fallback jika semua adalah tag dasar/batu
+        if (slot.Tags != null && slot.Tags.Length > 0)
+        {
+            foreach (var tag in slot.Tags)
+            {
+                string mapped = MapTagToPrototype(tag.Id);
+                if (mapped != null) return mapped;
+            }
+        }
+        if (slot.Materials != null && slot.Materials.Length > 0)
+        {
+            foreach (var mat in slot.Materials)
+            {
+                string mapped = MapTagToPrototype(mat.Id);
                 if (mapped != null) return mapped;
             }
         }
@@ -2082,51 +2145,106 @@ public partial class ServerPlayer
         string[] parts = args.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0)
         {
-            SendCheatReply("Gunakan: /craft <nama_resep|prototype> [jumlah] [level]\nContoh: /craft blade_bone 1 60\nAtau: /craft all (buka semua resep)", header);
+            SendCheatReply("Gunakan: /craft <nama_resep|prototype> [jumlah] [level]\nContoh: /craft blade_sword_metal_02 1 60\nAtau: /craft razor 1 60\nAtau: /craft all (buka semua resep)", header);
             return;
         }
-        string query = parts[0];
-        int count = parts.Length >= 2 && int.TryParse(parts[1], out int c) ? Math.Clamp(c, 1, 99) : 1;
-        int level = parts.Length >= 3 && int.TryParse(parts[2], out int lv) ? Math.Clamp(lv, 1, 60) : Math.Max(1, Level);
+
+        int count = 1;
+        int level = Math.Max(60, Level);
+        var tokens = new List<string>(parts);
+
+        // Parse trailing numbers for count and level if present
+        if (tokens.Count >= 3 && int.TryParse(tokens[^1], out int parsedLv) && int.TryParse(tokens[^2], out int parsedCount))
+        {
+            level = Math.Clamp(parsedLv, 1, 60);
+            count = Math.Clamp(parsedCount, 1, 99);
+            tokens.RemoveRange(tokens.Count - 2, 2);
+        }
+        else if (tokens.Count >= 2 && int.TryParse(tokens[^1], out int parsedNum))
+        {
+            count = Math.Clamp(parsedNum, 1, 99);
+            tokens.RemoveAt(tokens.Count - 1);
+        }
+        string query = string.Join(" ", tokens).Trim();
+        if (string.IsNullOrEmpty(query))
+        {
+            SendCheatReply("Gunakan: /craft <nama_resep|prototype> [jumlah] [level]", header);
+            return;
+        }
 
         string prototype = null;
         string displayName = null;
         string icon = null;
 
-        // 1. Exact recipe
-        if (RecipeMeta.Map.TryGetValue(query, out RecipeMeta.Info meta))
+        // 1. Check RecipeAliases / ResolveRecipeId
+        string recipeId = ResolveRecipeId(query);
+        if (recipeId != null)
         {
-            prototype = ResolveOutputPrototype(query, meta, null);
-            if (RecipeData.RecipeInfo.TryGetValue(query, out var rInfo))
+            if (RecipeMeta.Map.TryGetValue(recipeId, out RecipeMeta.Info meta))
+            {
+                prototype = ResolveOutputPrototype(recipeId, meta, null);
+            }
+            else if (ItemNameData.Map.ContainsKey(recipeId))
+            {
+                prototype = recipeId;
+            }
+
+            if (RecipeData.RecipeInfo.TryGetValue(recipeId, out var rInfo))
             {
                 displayName = rInfo.name;
                 icon = rInfo.icon;
             }
         }
-        else
+
+        // 2. Exact or substring search in RecipeMeta
+        if (prototype == null)
         {
-            // Substring or case-insensitive search in RecipeMeta
-            foreach (var kvp in RecipeMeta.Map)
+            if (RecipeMeta.Map.TryGetValue(query, out RecipeMeta.Info meta))
             {
-                if (kvp.Key.Equals(query, StringComparison.OrdinalIgnoreCase) || kvp.Key.Contains(query, StringComparison.OrdinalIgnoreCase))
+                prototype = ResolveOutputPrototype(query, meta, null);
+                if (RecipeData.RecipeInfo.TryGetValue(query, out var rInfo))
                 {
-                    prototype = ResolveOutputPrototype(kvp.Key, kvp.Value, null);
-                    if (RecipeData.RecipeInfo.TryGetValue(kvp.Key, out var rInfo))
+                    displayName = rInfo.name;
+                    icon = rInfo.icon;
+                }
+            }
+            else
+            {
+                foreach (var kvp in RecipeMeta.Map)
+                {
+                    if (kvp.Key.Equals(query, StringComparison.OrdinalIgnoreCase) || kvp.Key.Contains(query, StringComparison.OrdinalIgnoreCase))
                     {
-                        displayName = rInfo.name;
-                        icon = rInfo.icon;
+                        prototype = ResolveOutputPrototype(kvp.Key, kvp.Value, null);
+                        if (RecipeData.RecipeInfo.TryGetValue(kvp.Key, out var rInfo))
+                        {
+                            displayName = rInfo.name;
+                            icon = rInfo.icon;
+                        }
+                        break;
                     }
-                    break;
                 }
             }
         }
 
-        // 2. Prototype or common alias
+        // 3. Prototype or common alias
         if (prototype == null)
         {
             string lower = query.ToLowerInvariant();
             switch (lower)
             {
+                case "razor":
+                case "razor blade":
+                case "giant razor":
+                case "giant razor blade":
+                case "blade_sword_metal_02": prototype = "blade_sword_metal_02"; break;
+                case "big razor":
+                case "large razor":
+                case "blade_big_sword_metal_02": prototype = "blade_big_sword_metal_02"; break;
+                case "razor sword":
+                case "giant razor sword":
+                case "sword_metal_02": prototype = "sword_metal_02"; break;
+                case "big razor sword":
+                case "big_sword_metal_02": prototype = "big_sword_metal_02"; break;
                 case "axe": prototype = "axe_onehand_stone_01"; break;
                 case "workaxe":
                 case "work_axe": prototype = "axe_tool_bone_01"; break;
@@ -2167,17 +2285,26 @@ public partial class ServerPlayer
 
         if (prototype == null)
         {
-            SendCheatReply($"Resep atau item '{query}' tidak ditemukan. Contoh pemakaian: /craft blade_bone atau /craft stone_work_axe", header);
+            SendCheatReply($"Resep atau item '{query}' tidak ditemukan. Contoh: /craft blade_sword_metal_02 1 60 atau /craft razor 1 60", header);
             return;
         }
 
         displayName = ItemNameData.NameOf(prototype, displayName ?? prototype);
         icon = ItemNameData.IconOf(prototype, icon ?? string.Empty);
 
+        if (FreeInventorySlots() < count)
+        {
+            if (InventoryMaxSize < 1000)
+            {
+                InventoryMaxSize = Math.Min(1000, _inventory.Count + count + 50);
+                MarkDirty();
+            }
+        }
+
         int room = FreeInventorySlots();
         if (room <= 0)
         {
-            SendCheatReply("Tas inventory penuh! Buang atau simpan beberapa item sebelum crafting.", header);
+            SendCheatReply("Tas inventory penuh! Gunakan /bag 200 atau /bag clear terlebih dahulu.", header);
             return;
         }
 

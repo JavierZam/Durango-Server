@@ -906,7 +906,7 @@ public partial class ServerPlayer
             RepairRequirement = ToolDurability.RepairRequirementFor(generator.Id),
             FounderId = null,
             FounderCategory = null,
-            Tags = ItemTagData.For(generator.Id),
+            Tags = ItemTagData.For(generator.Id, level),
             TagModifications = null,
             // แนบช่องที่ใส่ได้ไปด้วย ไม่งั้น client กดใส่อุปกรณ์ไม่ได้ (ดู EquipData.PerformanceFor)
             Performance = EquipData.PerformanceFor(generator.Id),

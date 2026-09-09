@@ -82,6 +82,19 @@ public partial class ServerPlayer
             }
         }
         ApplyInventoryStateSave(save);
+        // Pastikan semua tag item di inventory memiliki level sesuai level item (cegah Insufficient item level)
+        lock (_inventory)
+        {
+            for (int i = 0; i < _inventory.Count; i++)
+            {
+                Item it = _inventory[i];
+                if (it.Level > 1 && !string.IsNullOrEmpty(it.Prototype))
+                {
+                    it.Tags = ItemTagData.For(it.Prototype, it.Level);
+                    _inventory[i] = it;
+                }
+            }
+        }
         ApplyPoiSave(save);
 
         if (save.KnownSkills != null && save.KnownSkills.Count > 0)

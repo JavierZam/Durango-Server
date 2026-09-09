@@ -45,7 +45,7 @@ public partial class ServerPlayer
     /// ไอเทมชิ้นนี้เข้าเงื่อนไขข้อไหนข้อหนึ่งไหม (สูตรขอแบบ "อย่างใดอย่างหนึ่ง")
     /// ไม่ได้ระบุอะไรมา = ผ่าน
     /// </summary>
-    private static bool MatchesAny(string prototype, TagRequirement[] wanted)
+    private static bool MatchesAny(Item item, TagRequirement[] wanted)
     {
         if (wanted == null || wanted.Length == 0)
         {
@@ -53,12 +53,49 @@ public partial class ServerPlayer
         }
         for (int i = 0; i < wanted.Length; i++)
         {
-            if (ItemTagData.LevelOf(prototype, wanted[i].Id) >= wanted[i].Level)
+            if (GetItemTagLevel(item, wanted[i].Id) >= wanted[i].Level)
             {
                 return true;
             }
         }
         return false;
+    }
+
+    private static bool MatchesAny(string prototype, TagRequirement[] wanted, int level = 1)
+    {
+        if (wanted == null || wanted.Length == 0)
+        {
+            return true;
+        }
+        for (int i = 0; i < wanted.Length; i++)
+        {
+            if (ItemTagData.LevelOf(prototype, wanted[i].Id, level) >= wanted[i].Level)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static int GetItemTagLevel(Item item, string tagId)
+    {
+        if (string.IsNullOrEmpty(tagId) || string.IsNullOrEmpty(item.Prototype)) return 0;
+        if (item.Tags != null)
+        {
+            for (int i = 0; i < item.Tags.Length; i++)
+            {
+                if (item.Tags[i].Id == tagId)
+                {
+                    return Math.Max(item.Tags[i].Level, item.Level);
+                }
+            }
+        }
+        int baseLv = ItemTagData.LevelOf(item.Prototype, tagId, item.Level);
+        if (baseLv > 0)
+        {
+            return Math.Max(baseLv, item.Level);
+        }
+        return 0;
     }
 
     /// <summary>
@@ -142,26 +179,27 @@ public partial class ServerPlayer
                     reason = $"ไอเทม {id} ถูกล็อกอยู่ ปลดล็อกก่อนนำมาคราฟต์";
                     return false;
                 }
-                string proto = null;
+                Item it;
                 lock (_inventory)
                 {
-                    int inv = _inventory.FindIndex(it => it.Id == id);
+                    int inv = _inventory.FindIndex(x => x.Id == id);
                     if (inv < 0)
                     {
                         reason = $"ไม่มีไอเทม {id} อยู่ในกระเป๋า";
                         return false;
                     }
-                    proto = _inventory[inv].Prototype;
+                    it = _inventory[inv];
                 }
+                string proto = it.Prototype;
                 // GP-08b: วัตถุดิบต้อง "ใช่ของที่สูตรขอ" จริง ๆ ไม่ใช่แค่มีของอยู่ในกระเป๋า
-                // สูตรระบุเป็น tag (เช่น "chunk_normal") กับวัสดุ (เช่น "stone") — ทั้งสองอย่าง
-                // เป็น tag ของไอเทมเหมือนกัน ต่างกันแค่บทบาทในสูตร
-                if (!MatchesAny(proto, slot.Tags))
+                // สูตรระบุเป็น tag (เช่น "chunk_normal") กับวัสดุ (เช่น "stone")
+                // ตรวจระดับ tag จากไอเทมจริง (it.Level / it.Tags)
+                if (!MatchesAny(it, slot.Tags))
                 {
                     reason = $"ช่อง '{slot.Id}' ต้องการ {string.Join("/", DescribeRequirements(slot.Tags))} แต่ {proto} ไม่ใช่";
                     return false;
                 }
-                if (!MatchesAny(proto, slot.Materials))
+                if (!MatchesAny(it, slot.Materials))
                 {
                     reason = $"ช่อง '{slot.Id}' ต้องทำจาก {string.Join("/", DescribeRequirements(slot.Materials))} แต่ {proto} ไม่ใช่";
                     return false;
@@ -574,7 +612,7 @@ public partial class ServerPlayer
             RepairRequirement = ToolDurability.RepairRequirementFor(prototype),
             FounderId = null,
             FounderCategory = null,
-            Tags = ItemTagData.For(prototype),
+            Tags = ItemTagData.For(prototype, level),
             TagModifications = null,
             // แนบช่องที่ใส่ได้ไปด้วย ไม่งั้น client กดใส่อุปกรณ์ไม่ได้ (ดู EquipData.PerformanceFor)
             Performance = EquipData.PerformanceFor(prototype),
@@ -638,8 +676,8 @@ public partial class ServerPlayer
                     resolved != null ? ItemNameData.IconOf(outProto, string.Empty)
                                      : ItemProcessing.ProcessedIcon(recipeId, basePrototype), level);
                 shaped.Tags = resolved != null
-                    ? ItemTagData.For(outProto)
-                    : ItemProcessing.ShapeChangedTags(recipeId, basePrototype);
+                    ? ItemTagData.For(outProto, level)
+                    : ItemProcessing.ShapeChangedTags(recipeId, basePrototype, level);
                 items.Add(shaped);
                 continue;
             }
@@ -647,7 +685,7 @@ public partial class ServerPlayer
             Item cooked = MakeCraftedItem(basePrototype,
                 ItemProcessing.ProcessedName(recipeId, basePrototype, basePrototype),
                 ItemProcessing.ProcessedIcon(recipeId, basePrototype), level);
-            cooked.Tags = ItemProcessing.ProcessedTags(basePrototype);
+            cooked.Tags = ItemProcessing.ProcessedTags(basePrototype, level);
             items.Add(cooked);
         }
         return items;

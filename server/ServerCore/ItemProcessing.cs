@@ -34,9 +34,9 @@ public static class ItemProcessing
     public const string BaseSlot = "base";
 
     /// <summary>tag ของของที่แปรรูปแล้ว — ตัด `raw_food` ออก เติม `taste_good`</summary>
-    public static Tag[] ProcessedTags(string basePrototype)
+    public static Tag[] ProcessedTags(string basePrototype, int level = 1)
     {
-        Tag[] tags = ItemTagData.For(basePrototype) ?? Array.Empty<Tag>();
+        Tag[] tags = ItemTagData.For(basePrototype, level) ?? Array.Empty<Tag>();
         var result = new List<Tag>(tags.Length + 1);
         bool hasCooked = false;
         for (int i = 0; i < tags.Length; i++)
@@ -53,7 +53,7 @@ public static class ItemProcessing
         }
         if (!hasCooked)
         {
-            result.Add(new Tag { Id = CookedTag, Level = 1 });
+            result.Add(new Tag { Id = CookedTag, Level = Math.Max(1, level) });
         }
         return result.ToArray();
     }
@@ -118,10 +118,10 @@ public static class ItemProcessing
         => !string.IsNullOrEmpty(recipeId) && ShapeChanges.ContainsKey(recipeId);
 
     /// <summary>tag ของของหลังเปลี่ยนรูปทรง (null = สูตรนี้ไม่ใช่สูตรเปลี่ยนรูปทรง)</summary>
-    public static Tag[] ShapeChangedTags(string recipeId, string basePrototype)
+    public static Tag[] ShapeChangedTags(string recipeId, string basePrototype, int level = 1)
     {
         if (!ShapeChanges.TryGetValue(recipeId ?? string.Empty, out var change)) { return null; }
-        Tag[] tags = ItemTagData.For(basePrototype) ?? Array.Empty<Tag>();
+        Tag[] tags = ItemTagData.For(basePrototype, level) ?? Array.Empty<Tag>();
         var result = new List<Tag>(tags.Length + 1);
         bool hasNew = false;
         for (int i = 0; i < tags.Length; i++)
@@ -130,7 +130,7 @@ public static class ItemProcessing
             if (tags[i].Id == change.Add) { hasNew = true; }
             result.Add(tags[i]);
         }
-        if (!hasNew) { result.Add(new Tag { Id = change.Add, Level = 1 }); }
+        if (!hasNew) { result.Add(new Tag { Id = change.Add, Level = Math.Max(1, level) }); }
         return result.ToArray();
     }
 

@@ -1930,11 +1930,27 @@ public static class ItemTagData
     };
 
     /// <summary>tag ของไอเทมชิ้นนี้ (ไม่รู้จัก = ไม่มี tag เลย ไม่ใช่ null)</summary>
-    public static Tag[] For(string prototype)
+    public static Tag[] For(string prototype) => For(prototype, 1);
+
+    /// <summary>tag ของไอเทมชิ้นนี้ ปรับระดับ tag ให้สอดคล้องกับเลเวลของไอเทม (แก้ปัญหา Insufficient item level ใน Client)</summary>
+    public static Tag[] For(string prototype, int level)
     {
         if (prototype != null && Map.TryGetValue(prototype, out Tag[] tags))
         {
-            return tags;
+            if (level <= 1)
+            {
+                return tags;
+            }
+            Tag[] scaled = new Tag[tags.Length];
+            for (int i = 0; i < tags.Length; i++)
+            {
+                scaled[i] = new Tag
+                {
+                    Id = tags[i].Id,
+                    Level = Math.Max(tags[i].Level, level)
+                };
+            }
+            return scaled;
         }
         return System.Array.Empty<Tag>();
     }
@@ -1981,9 +1997,12 @@ public static class ItemTagData
     }
 
     /// <summary>ไอเทมชิ้นนี้มี tag นี้ระดับเท่าไร (0 = ไม่มี)</summary>
-    public static int LevelOf(string prototype, string tag)
+    public static int LevelOf(string prototype, string tag) => LevelOf(prototype, tag, 1);
+
+    /// <summary>ไอเทมชิ้นนี้มี tag นี้ระดับเท่าไรตามเลเวลของไอเทม (0 = ไม่มี)</summary>
+    public static int LevelOf(string prototype, string tag, int level)
     {
-        Tag[] tags = For(prototype);
+        Tag[] tags = For(prototype, level);
         for (int i = 0; i < tags.Length; i++)
         {
             if (tags[i].Id == tag)
