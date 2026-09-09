@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using Durango.Offline;
 using Newtonsoft.Json;
@@ -247,6 +248,8 @@ public sealed class CharacterService
         {
             ApplyJobSkillBoost(save, job);
         }
+        int starterSpent = SkillNodeData.UsedCost(save.KnownSkills.Select(s => s.ToBundle()).ToList());
+        save.SkillPoints = Math.Max(15, starterSpent + 15);
         SaveStore.Save(SaveStore.PlayerPath(entityId), save);
 
         // 🐛 [แก้เอง 30 ส.ค. 2026] ตัวละครที่เพิ่งสร้าง **ไม่เคยถูกผูกบัญชีเลย**

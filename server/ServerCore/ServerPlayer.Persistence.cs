@@ -97,10 +97,9 @@ public partial class ServerPlayer
             }
         }
 
-        if (save.SkillPoints > 0)
-        {
-            _skillPoints = save.SkillPoints;
-        }
+        int spentCost = SkillNodeData.UsedCost(_knownSkills);
+        int minSp = spentCost + 15 + Math.Max(0, Level - 1) * (ServerConfig.Current.Exp?.SkillPointsPerLevel ?? 3);
+        _skillPoints = Math.Max(save.SkillPoints, minSp);
 
         // รอยแยก/วาร์ปเรกเซเลอเรเตอร์ — Warp Matter สะสม (ดู ServerPlayer.WarpAccelerator.cs)
         _warpMatterBalance = save.WarpMatterBalance;
@@ -158,9 +157,19 @@ public partial class ServerPlayer
         bool sameIsland = here == null || string.Equals(save.LastIsland, here, StringComparison.OrdinalIgnoreCase);
         if (save.HasPosition && sameIsland)
         {
-            _lastPosition = new WorldPosition(save.PosX, save.PosY);
-            _lastYaw = save.Yaw;
-            _hasPosition = true;
+            int tileX = (int)(save.PosX / 200f);
+            int tileY = (int)(save.PosY / 200f);
+            if (tileX >= 0 && tileX < _world.Terrain.Width && tileY >= 0 && tileY < _world.Terrain.Height)
+            {
+                _lastPosition = new WorldPosition(save.PosX, save.PosY);
+                _lastYaw = save.Yaw;
+                _hasPosition = true;
+            }
+            else
+            {
+                Console.WriteLine("[persistence] {0} posisi ({1},{2}) di luar batas pulau ({3}x{4}) -> spawn di EntryPoint",
+                    Name, tileX, tileY, _world.Terrain.Width, _world.Terrain.Height);
+            }
         }
         else if (save.HasPosition)
         {

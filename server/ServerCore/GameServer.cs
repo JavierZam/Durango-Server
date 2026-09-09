@@ -690,10 +690,11 @@ public class GameServer
         {
             Id = "1",
             TerrainId = "1",
-            // [4 ก.ย. 2026] override เลเวลเกาะที่โชว์ให้ client (config RegionTemplateId) — เกาะเริ่มต้น Lv10
-            TemplateId = string.IsNullOrWhiteSpace(ServerConfig.Current.RegionTemplateId)
-                ? _world.Terrain.Info.region_template
-                : ServerConfig.Current.RegionTemplateId.Trim(),
+            TemplateId = !string.IsNullOrWhiteSpace(ServerConfig.Current.RegionTemplateId)
+                ? ServerConfig.Current.RegionTemplateId.Trim()
+                : (!string.IsNullOrWhiteSpace(_world.Terrain.Info.region_template)
+                    ? _world.Terrain.Info.region_template
+                    : (RegionTemplateData.Find(_world.Terrain.TerrainId)?.Name ?? "ri35te171228")),
             Role = RegionRole,
             Name = _world.ServerName,
             CreatedAt = 0.0

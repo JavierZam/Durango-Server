@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -141,6 +141,7 @@ public partial class ServerPlayer
         // [แก้เอง] 25 ส.ค. 2026 — เรียนสกิลใหม่ = RecipeUnlockData.Collect ได้ของเพิ่มทันที ต้อง push
         // เมนูคราฟต์ใหม่เหมือนตอนขึ้นเลเวล/ความชำนาญขึ้น (ดู SendUnlockedRecipesAndBlueprints)
         SendUnlockedRecipesAndBlueprints();
+        SendActions();
         // 🐛 เจ้าของสังเกต: "ในเกมมีเอฟเฟคหลายอย่างแต่ของเรายังไม่แสดงผล ตอนนี้แสดงแค่ xp" — เหมือน
         // LevelUpEffect (ดู GainExp ใน ServerPlayer.Progress.cs) เรียนสกิลก็ต้องส่ง Rewarded{SkillRewardEffect}
         // ถึงจะเด้งป๊อปอัพ/เล่นเอฟเฟคฝั่ง client (AlarmGroup.cs รอรับข้อความนี้โดยเฉพาะ)
@@ -281,7 +282,7 @@ public partial class ServerPlayer
         // AlwaysRecipes/AlwaysBlueprints = ของ "ฟรี" (ไม่ต้องเรียนสกิล) — ฝั่ง blueprint ไม่หักวัตถุดิบ
         // เลย (ข้อจำกัดเบต้า) ซ่อนจาก non-admin เมื่อเปิด config CraftMenu.HideFreeItems (default: on)
         // non-admin เห็นเฉพาะของที่ปลดล็อกด้วยสกิลจริง · admin ได้ครบเสมอ
-        bool hideFree = !IsAdmin && (ServerConfig.Current.CraftMenu?.HideFreeItems ?? false);
+        bool hideFree = !IsAdmin && !InstantCraft && (ServerConfig.Current.CraftMenu?.HideFreeItems ?? false);
         recipes = hideFree ? new HashSet<string>() : new HashSet<string>(RecipeUnlockData.AlwaysRecipes);
         // [3 ก.ย. 2026] 🐛 HideFreeItems ตั้งใจซ่อนพิมพ์เขียวของแต่ง/เฟอร์นิเจอร์เป็นร้อย ๆ ตัวที่รก
         //    เมนู แต่มันซ่อน "ทั้ง AlwaysBlueprints" ⇒ ซ่อนของจำเป็นสำหรับเอาชีวิตรอด/สายสอนเล่นไปด้วย
@@ -368,6 +369,10 @@ public partial class ServerPlayer
 
     private string[] UnlockedRecipes()
     {
+        if (InstantCraft)
+        {
+            return RecipeData.AllRecipeIds;
+        }
         BuildUnlocked(out HashSet<string> recipes, out HashSet<string> _);
         var arr = new string[recipes.Count];
         recipes.CopyTo(arr);
@@ -376,6 +381,10 @@ public partial class ServerPlayer
 
     private string[] UnlockedBlueprints()
     {
+        if (InstantCraft)
+        {
+            return RecipeData.AllBlueprintIds;
+        }
         BuildUnlocked(out HashSet<string> _, out HashSet<string> blueprints);
         var arr = new string[blueprints.Count];
         blueprints.CopyTo(arr);
@@ -428,7 +437,7 @@ public partial class ServerPlayer
     /// เรียนสกิลใหม่ (`HandleTrainSkill`) — client ฝั่ง `OnRecipeListMsg`/`OnBlueprintListMsg` อัพเดต
     /// `Available` list ให้เองอัตโนมัติทุกครั้งที่รับข้อความนี้อยู่แล้ว ไม่ต้องแก้อะไรฝั่ง client เลย
     /// </summary>
-    private void SendUnlockedRecipesAndBlueprints()
+    public void SendUnlockedRecipesAndBlueprints()
     {
         Send(new Recipes
         {
@@ -444,13 +453,15 @@ public partial class ServerPlayer
         });
     }
 
-    private void SendSkills()
+    public void SendSkills()
     {
         EnsureAutomaticSkills();
+        int spent = SkillNodeData.UsedCost(_knownSkills);
+        int totalSp = Math.Max(_skillPoints, spent);
         Send(new Skills
         {
             SkillList = _knownSkills.Count == 0 ? null : ClampSkillListForClient(_knownSkills),
-            SkillPoint = _skillPoints,
+            SkillPoint = totalSp,
             Categories = BuildSkillCategories(),
             UntrainedCount = 0,
             AdvisedSkills = null,

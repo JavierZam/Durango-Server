@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Durango.Network;
 using Messages;
@@ -33,19 +34,22 @@ public partial class ServerPlayer
     {
         if (IslandRegistry.All.Count == 0)
         {
-            return "เซิร์ฟนี้เปิดแบบเกาะเดียว (ไม่ได้ใส่ --island)";
+            return "Server ini berjalan dalam mode satu pulau (belum ada daftar pulau terdaftar).";
         }
+        string currentId = IslandRegistry.Current?.Id
+            ?? IslandRegistry.All.FirstOrDefault(i => string.Equals(i.Terrain, _world.Terrain.TerrainId, StringComparison.OrdinalIgnoreCase))?.Id;
+
         var sb = new StringBuilder();
-        sb.Append("เกาะทั้งหมด (คุณเลเวล ").Append(Level).Append("):");
+        sb.Append($"Daftar Pulau Tersedia (Level karaktermu: {Level}):");
         for (int i = 0; i < IslandRegistry.All.Count; i++)
         {
             IslandInfo isle = IslandRegistry.All[i];
-            bool here = IslandRegistry.Current != null && isle.Id == IslandRegistry.Current.Id;
+            bool here = currentId != null && string.Equals(isle.Id, currentId, StringComparison.OrdinalIgnoreCase);
             bool canGo = Level >= isle.RequiredLevel;
             sb.Append("\n  ").Append(isle.Id).Append(" | ").Append(isle.Name)
-              .Append(" | สัตว์ lv").Append(isle.MinLevel).Append('-').Append(isle.MaxLevel)
-              .Append(" | ต้องเลเวล ").Append(isle.RequiredLevel).Append('+')
-              .Append(here ? "  ← อยู่ที่นี่" : (canGo ? "  (ไปได้)" : "  (เลเวลไม่ถึง)"));
+              .Append(" | Hewan Lv.").Append(isle.MinLevel).Append('-').Append(isle.MaxLevel)
+              .Append(" | Butuh Lv.").Append(isle.RequiredLevel).Append('+')
+              .Append(here ? "  <-- Posisi Saat Ini" : (canGo ? "  [Bisa Dikunjungi - /travel " + isle.Id + "]" : "  [Level Belum Cukup]"));
         }
         return sb.ToString();
     }
@@ -58,39 +62,37 @@ public partial class ServerPlayer
     {
         if (!ServerConfig.Current.Features.IslandTravel)
         {
-            return "การเดินทางข้ามเกาะยังปิดอยู่ในรอบนี้ (เปิดที่ Features.IslandTravel ใน config.json)";
-        }
-        if (IslandRegistry.Current == null)
-        {
-            return "เซิร์ฟนี้เปิดแบบเกาะเดียว เดินทางไม่ได้ (ต้องเปิดด้วย --island)";
+            return "Perjalanan antar pulau sedang dinonaktifkan (fitur Features.IslandTravel = false).";
         }
         IslandInfo dest = IslandRegistry.Find(islandId);
         if (dest == null)
         {
-            return $"ไม่มีเกาะ '{islandId}' — มีอยู่: {string.Join(", ", IslandRegistry.Ids())}";
+            return $"Tidak ada pulau dengan ID '{islandId}'. Pulau tersedia: {string.Join(", ", IslandRegistry.Ids())}";
         }
-        if (dest.Id == IslandRegistry.Current.Id)
+        string currentId = IslandRegistry.Current?.Id
+            ?? IslandRegistry.All.FirstOrDefault(i => string.Equals(i.Terrain, _world.Terrain.TerrainId, StringComparison.OrdinalIgnoreCase))?.Id;
+        if (currentId != null && string.Equals(dest.Id, currentId, StringComparison.OrdinalIgnoreCase))
         {
-            return $"อยู่ที่ {dest.Name} อยู่แล้ว";
+            return $"Kamu sudah berada di {dest.Name}!";
         }
         if (Dead)
         {
-            return "ตายอยู่ เดินทางไม่ได้ — ฟื้นก่อน";
+            return "Karaktermu mati, hidupkan terlebih dahulu sebelum bepergian.";
         }
         if (Level < dest.RequiredLevel)
         {
-            return $"{dest.Name} ต้องเลเวล {dest.RequiredLevel} ขึ้นไป (ตอนนี้ {Level})";
+            return $"{dest.Name} membutuhkan Level {dest.RequiredLevel} ke atas (Levelmu saat ini: {Level}).";
         }
 
         // เซฟก่อนตัดสาย ไม่งั้นของที่เก็บมาหลัง autosave ครั้งล่าสุดหายทั้งหมด
         // และ LastIsland ต้องเป็น "เกาะที่กำลังจะออก" เพื่อให้ปลายทางรู้ว่าเป็นคนมาใหม่
         Save();
 
-        Console.WriteLine("[island] {0} เดินทาง {1} → {2} ({3})", Name, IslandRegistry.Current.Id, dest.Id, dest.Address);
+        Console.WriteLine("[island] {0} berlayar {1} -> {2} ({3})", Name, currentId ?? "single", dest.Id, dest.Address);
         Send(new Info { Text = GotoPrefix + dest.Address });
-        Send(new Info { Text = $"กำลังเดินทางไป {dest.Name}..." });
+        Send(new Info { Text = $"Sedang berlayar menuju {dest.Name}..." });
         Send(new Emigrated { Type = Shared.Teleport.TeleportType.Unknown });
-        return $"ส่ง {Name} ไป {dest.Name} ({dest.Address}) แล้ว";
+        return $"Mengirim {Name} ke {dest.Name} ({dest.Address}). Pastikan server pulau tersebut sedang berjalan!";
     }
 
     /// <summary>ตรวจว่าคำขอเดินทางมาจาก dock ที่มีอยู่จริงและผู้เล่นยืนอยู่ใกล้ dock</summary>
@@ -143,11 +145,12 @@ public partial class ServerPlayer
         var names = new List<string>();
         var levels = new List<int>();
         List<IslandInfo> reachable = IslandRegistry.ReachableFor(Level);
+        string currentId = IslandRegistry.Current?.Id
+            ?? IslandRegistry.All.FirstOrDefault(i => string.Equals(i.Terrain, _world.Terrain.TerrainId, StringComparison.OrdinalIgnoreCase))?.Id;
         for (int i = 0; i < reachable.Count; i++)
         {
             IslandInfo island = reachable[i];
-            if (IslandRegistry.Current != null
-                && string.Equals(island.Id, IslandRegistry.Current.Id, StringComparison.OrdinalIgnoreCase))
+            if (currentId != null && string.Equals(island.Id, currentId, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -185,10 +188,11 @@ public partial class ServerPlayer
             Send(Aborts.Reason(), header.Seq);
             return;
         }
-        if (IslandRegistry.Current != null
-            && string.Equals(destination.Id, IslandRegistry.Current.Id, StringComparison.OrdinalIgnoreCase))
+        string currentId = IslandRegistry.Current?.Id
+            ?? IslandRegistry.All.FirstOrDefault(i => string.Equals(i.Terrain, _world.Terrain.TerrainId, StringComparison.OrdinalIgnoreCase))?.Id;
+        if (currentId != null && string.Equals(destination.Id, currentId, StringComparison.OrdinalIgnoreCase))
         {
-            Send(new Info { Text = "คุณอยู่เกาะนี้อยู่แล้ว" }, header.Seq);
+            Send(new Info { Text = "Kamu sudah berada di pulau ini!" }, header.Seq);
             Send(Aborts.Reason(), header.Seq);
             return;
         }

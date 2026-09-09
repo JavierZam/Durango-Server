@@ -280,9 +280,9 @@ public static class Program
         // (โหลดก่อนเปิดพอร์ต ไม่งั้นคนแรกที่ต่อเข้ามาจะยังไม่ถูกตรวจ)
         BanList.Load(dataDir);
         string configPath = Path.Combine(dataDir, "config.json");
+        IslandRegistry.Load(Path.Combine(dataDir, "islands.json"));
         if (!string.IsNullOrEmpty(islandId))
         {
-            IslandRegistry.Load(Path.Combine(dataDir, "islands.json"));
             if (!IslandRegistry.Select(islandId))
             {
                 Console.WriteLine("[fatal] ไม่มีเกาะนี้ในทะเบียน");

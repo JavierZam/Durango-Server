@@ -239,6 +239,7 @@ public partial class ServerPlayer
         if (msg.SlotType == _currentEquipSlotType) _world.BroadcastToViewers(EntityId, _display);
         // อุปกรณ์มีผลกับดาเมจ/ค่าป้องกัน/หลอดแล้ว — หน้าตัวละครกับหลอดต้องอัปเดตทันที
         RefreshAbilities();
+        SendActions();
         if (equip)
         {
             // นับเฉพาะตอน "ใส่" ไม่นับตอนถอด (ไม่งั้นใส่-ถอดสลับกันก็ผ่านเควสได้)
@@ -271,6 +272,7 @@ public partial class ServerPlayer
         Send(RebuildEquipments());
         _world.BroadcastToViewers(EntityId, _display);
         RefreshAbilities();
+        SendActions();
     }
 
     private void HandleAttachAccessory(AttachAccessory msg, PacketHeader header)

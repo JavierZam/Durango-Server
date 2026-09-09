@@ -857,7 +857,9 @@ public partial class ServerPlayer
                     // ต้องตรงกับที่ GameServer.SendWelcome ส่งไป ไม่งั้น client ถือว่า "ยังไม่ได้อยู่บนเกาะตัวเอง"
                     Id = "1",
                     TerrainId = "1",
-                    TemplateId = _world.Terrain.Info.region_template,
+                    TemplateId = !string.IsNullOrWhiteSpace(ServerConfig.Current.RegionTemplateId)
+                        ? ServerConfig.Current.RegionTemplateId.Trim()
+                        : _world.Terrain.Info.region_template,
                     Role = GameServer.RegionRole,
                     Name = _world.ServerName,
                     CreatedAt = 0.0

@@ -23,7 +23,9 @@ public partial class ServerPlayer
         {
             Id = "1",
             TerrainId = "1",
-            TemplateId = _world.Terrain.Info.region_template,
+            TemplateId = !string.IsNullOrWhiteSpace(ServerConfig.Current.RegionTemplateId)
+                ? ServerConfig.Current.RegionTemplateId.Trim()
+                : _world.Terrain.Info.region_template,
             Role = GameServer.RegionRole,
             Name = _world.ServerName,
             CreatedAt = 0

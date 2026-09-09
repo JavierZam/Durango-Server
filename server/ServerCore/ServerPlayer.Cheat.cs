@@ -172,18 +172,22 @@ public partial class ServerPlayer
                 "• /heal - Pulihkan darah & stamina penuh, hilangkan lelah\n" +
                 "• /god - Mode kebal (tidak bisa mati / kebal serangan)\n" +
                 "• /peace - Mode damai (dinosaurus tidak akan menyerang)\n" +
+                "• /instantcraft - Mode craft instan (bebas bahan & stamina)\n" +
+                "• /craft all - Buka seluruh resep crafting & blueprint bangunan\n" +
+                "• /sp <jumlah> - Tambahkan poin skill (SP)\n" +
+                "• /maxskills - Buka semua skill dan maksimalkan level\n" +
                 "• /tame - Menjinakkan dinosaurus terdekat (radius 25 tile)\n" +
                 "• /pet <list|spawn|return|mount|unmount|stay|follow|feed|add>\n" +
                 "• /mount & /unmount - Menaiki / turun dari pet aktif\n" +
                 "• /stay & /follow - Perintahkan pet diam / ikuti pemain\n" +
                 "• /give <nama_item> [jumlah] [level] - Dapatkan item apapun\n" +
                 "• /level <1-60> - Atur level karakter langsung\n" +
-                "• /maxskills - Buka semua skill dan maksimalkan level\n" +
                 "• /money <jumlah> - Tambahkan DurangoCoin\n" +
                 "• /clearbag - Kosongkan seluruh tas inventory\n" +
                 "• /spawn <trex/raptor/pack/id> - Munculkan dinosaurus\n" +
                 "• /kill - Kalahkan dinosaurus terdekat\n" +
-                "• /tp <x> <y> atau /tp spawn - Teleportasi posisi\n" +
+                "• /tp <x> <y> /tp spawn /tp center - Teleportasi posisi\n" +
+                "• /islands & /travel <id> - Informasi dan perjalanan antar pulau\n" +
                 "• /survival - Periksa status darah, stamina, lelah\n" +
                 "• /save - Simpan progres dunia dan karakter";
             SendCheatReply(helpText, header);
@@ -200,6 +204,19 @@ public partial class ServerPlayer
                 MarkDirty();
                 SendStatistics();
                 SendCheatReply($"Level karakter berhasil diatur ke {Level}!", header);
+                return;
+            }
+        }
+
+        if (cmd.StartsWith("sp ", StringComparison.Ordinal) || cmd.StartsWith("skillpoint ", StringComparison.Ordinal))
+        {
+            string[] parts = cmd.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2 && int.TryParse(parts[1], out int spAdd))
+            {
+                _skillPoints = Math.Max(0, _skillPoints + spAdd);
+                MarkDirty();
+                SendSkills();
+                SendCheatReply($"Berhasil menambahkan {spAdd} Poin Skill (SP)! (Total SP saat ini: {_skillPoints})", header);
                 return;
             }
         }
@@ -663,7 +680,7 @@ public partial class ServerPlayer
 
         // tp <tileX> <tileY> — วาร์ปตัวเองไปพิกัดที่ระบุ
         // ไว้เทสระยะการมองเห็น (เดินจริงติดเพดานความเร็ว M-2 ต้องเดินหลายรอบกว่าจะพ้นระยะ)
-        if (cmd.StartsWith("tp ", StringComparison.Ordinal) && cmd != "tp spawn")
+        if (cmd.StartsWith("tp ", StringComparison.Ordinal) && cmd != "tp spawn" && cmd != "tp center")
         {
             string[] t = cmd.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             if (t.Length >= 3 && int.TryParse(t[1], out int tx) && int.TryParse(t[2], out int ty))
@@ -673,7 +690,7 @@ public partial class ServerPlayer
             }
             else
             {
-                SendCheatReply("Gunakan: /tp <tileX> <tileY>", header);
+                SendCheatReply("Gunakan: /tp <tileX> <tileY> atau /tp spawn atau /tp center", header);
             }
             return;
         }
@@ -729,9 +746,10 @@ public partial class ServerPlayer
         }
 
         // travel <รหัสเกาะ> — เดินทางข้ามเกาะ (Beta 1.1)
-        if (cmd.StartsWith("travel ", StringComparison.Ordinal))
+        if (cmd.StartsWith("travel ", StringComparison.Ordinal) || cmd.StartsWith("warp ", StringComparison.Ordinal))
         {
-            string want = cmd.Substring("travel ".Length).Trim();
+            string prefix = cmd.StartsWith("travel ", StringComparison.Ordinal) ? "travel " : "warp ";
+            string want = cmd.Substring(prefix.Length).Trim();
             SendCheatReply(TravelTo(want), header);
             return;
         }
@@ -749,12 +767,45 @@ public partial class ServerPlayer
 
         switch (cmd)
         {
+            case "island":
             case "islands":
                 SendCheatReply(DescribeIslands(), header);
                 break;
             case "tp spawn":
-                SendTeleport(_world.GetEntryPosition());
+            {
+                var entry = _world.GetEntryPosition();
+                ControlTeleport((int)(entry.x / 200f), (int)(entry.y / 200f));
+                SendCheatReply($"Teleport ke titik spawn pulau (tile {(int)(entry.x / 200f)},{(int)(entry.y / 200f)}).", header);
                 break;
+            }
+            case "tp center":
+            {
+                int cx = _world.Terrain.Width / 2;
+                int cy = _world.Terrain.Height / 2;
+                ControlTeleport(cx, cy);
+                SendCheatReply($"Teleport ke tengah pulau (tile {cx},{cy}).", header);
+                break;
+            }
+            case "instantcraft":
+            case "instant craft":
+            case "craft instant":
+            {
+                InstantCraft = !InstantCraft;
+                SendUnlockedRecipesAndBlueprints();
+                SendCheatReply(InstantCraft
+                    ? "Mode Instant Craft AKTIF: Semua resep terbuka, bebas bahan & stamina, craft selesai instan (0.05s)!"
+                    : "Mode Instant Craft NONAKTIF.", header);
+                break;
+            }
+            case "craft all":
+            case "unlockrecipes":
+            case "unlock all":
+            {
+                Send(new Recipes { Ids = RecipeData.AllRecipeIds });
+                Send(new ArtifactBlueprints { Ids = RecipeData.AllBlueprintIds });
+                SendCheatReply($"Berhasil membuka seluruh ({RecipeData.AllRecipeIds.Length}) resep crafting & ({RecipeData.AllBlueprintIds.Length}) blueprint bangunan!", header);
+                break;
+            }
             case "info":
                 SendCheatReply("DurangoServer v0.1 - Pemain online: " + _world.Count, header);
                 break;

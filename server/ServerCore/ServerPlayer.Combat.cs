@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Durango.Network;
 using Durango.Utils;
@@ -56,25 +56,7 @@ public partial class ServerPlayer
 
     private void HandleGetActions(GetActions msg, PacketHeader header)
     {
-        string[] ids = ActionData.ForWeaponTag(CurrentWeaponTag());
-        // [แก้เอง] 25 ส.ค. 2026 — ส่งเฉพาะท่าที่ผู้เล่นปลดล็อกแล้วจริง (ท่าพื้นฐาน + ท่าจากสกิลที่เรียน)
-        // เดิมส่งครบทุกท่าของอาวุธ ⇒ หน้าต่างท่าแสดงท่าที่ยังไม่ได้เรียนสกิลด้วย
-        HashSet<string> unlocked = UnlockedActions();
-        var list = new List<ActionStatus>(ids.Length);
-        for (int i = 0; i < ids.Length; i++)
-        {
-            if (ActionData.TryGet(ids[i], out ActionData.Action a) && unlocked.Contains(a.Id))
-            {
-                list.Add(new ActionStatus
-                {
-                    Id = a.Id,
-                    Stamina = a.Stamina,
-                    Cooltime = a.Cooltime
-                });
-            }
-        }
-        Console.WriteLine("[combat] {0} ขอรายการท่า ({1} ท่า, อาวุธ {2})", Name, list.Count, CurrentWeaponTag());
-        Send(new Actions { BattleActions = list.ToArray() }, header.Seq);
+        SendActions(header.Seq);
     }
 
     private void HandleUseBattleAction(UseBattleAction msg, PacketHeader header)
@@ -419,15 +401,72 @@ public partial class ServerPlayer
     // ───────────────────────── helper ─────────────────────────
 
     /// <summary>tag ของอาวุธที่ถืออยู่ (bare_hands ถ้าไม่ได้ถืออะไร)</summary>
-    private string CurrentWeaponTag()
+    public string CurrentWeaponTag()
     {
         // ดูทั้งช่อง main และ both — อาวุธสองมือ 121 ชิ้นอยู่ช่อง "both"
         if (TryGetWeaponItem(out _, out EquipData.WeaponInfo info) && !string.IsNullOrEmpty(info.Framework))
         {
-            // framework ในข้อมูลอาวุธ (onehand/twohand/bow...) ตรงกับคีย์ของ tag_allow_actions
-            return info.Framework;
+            string fw = info.Framework.ToLowerInvariant();
+            string at = info.AttackType?.ToLowerInvariant() ?? "";
+
+            if (fw == "bow") return "bow";
+            if (fw == "crossbow") return "crossbow";
+            if (fw == "lance" || at == "spear" || at == "lance") return "lance_twohand";
+
+            if (!string.IsNullOrEmpty(at) && !string.IsNullOrEmpty(fw))
+            {
+                string combo = $"{at}_{fw}";
+                if (ActionData.WeaponActions.ContainsKey(combo))
+                {
+                    return combo;
+                }
+            }
+            if (fw == "onehand")
+            {
+                if (at == "axe") return "axe_onehand";
+                if (at == "blunt") return "blunt_onehand";
+                return "sword_onehand";
+            }
+            if (fw == "twohand")
+            {
+                if (at == "axe") return "axe_twohand";
+                if (at == "blunt") return "blunt_twohand";
+                return "sword_twohand";
+            }
+            return fw;
         }
         return "bare_hands";
+    }
+
+    /// <summary>ส่งรายการท่าต่อสู้ของอาวุธปัจจุบันให้ client (push อัตโนมัติเมื่อใส่/ถอดอาวุธหรือเปลี่ยนสกิล)</summary>
+    public void SendActions(uint replySeq = 0)
+    {
+        string weaponTag = CurrentWeaponTag();
+        string[] ids = ActionData.ForWeaponTag(weaponTag);
+        HashSet<string> unlocked = UnlockedActions();
+        var list = new List<ActionStatus>(ids.Length);
+        for (int i = 0; i < ids.Length; i++)
+        {
+            if (ActionData.TryGet(ids[i], out ActionData.Action a) && unlocked.Contains(a.Id))
+            {
+                list.Add(new ActionStatus
+                {
+                    Id = a.Id,
+                    Stamina = a.Stamina,
+                    Cooltime = a.Cooltime
+                });
+            }
+        }
+        Console.WriteLine("[combat] {0} ส่งรายการท่า {1} ท่า (อาวุธ: {2})", Name, list.Count, weaponTag);
+        Actions pkt = new Actions { BattleActions = list.ToArray() };
+        if (replySeq > 0)
+        {
+            Send(pkt, replySeq);
+        }
+        else
+        {
+            Send(pkt);
+        }
     }
 
     private bool IsRangedWeapon()

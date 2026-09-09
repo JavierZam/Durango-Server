@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -36,6 +36,9 @@ public partial class ServerPlayer
 {
     /// <summary>[TodoList/06] สุ่มผลคราฟต์ (ล้มเหลว/สำเร็จมาก)</summary>
     private readonly Random _craftRng = new Random();
+
+    /// <summary>โหมดคราฟต์ทันที ไม่ต้องมีวัตถุดิบ/ไม่เสียสตามินา/เสร็จ 0.05 วิ/ปลดล็อกทุกสูตร</summary>
+    public bool InstantCraft { get; set; }
 
 
     /// <summary>
@@ -901,7 +904,7 @@ public partial class ServerPlayer
         // เปลี่ยนมาเช็คของจริงแทน: สูตรนี้ต้องอยู่ใน unlocked set จริง (AlwaysRecipes หรือเรียนสกิลมาแล้ว)
         // — เดิม handler นี้ไม่เคยเช็คเรื่องปลดล็อกเลย พึ่งแค่ Available flag ฝั่ง client (เชื่อ client
         // ไม่ได้) ตอนนี้เช็คจริงที่นี่ด้วย ให้ตรงกับ "รายการคราฟอ้างอิงจากสกิลเท่านั้น"
-        if (Array.IndexOf(UnlockedRecipes(), msg.RecipeId) < 0)
+        if (!InstantCraft && Array.IndexOf(UnlockedRecipes(), msg.RecipeId) < 0)
         {
             Console.WriteLine("[craft] ปฏิเสธ {0} สูตร {1}: ยังไม่ปลดล็อก (ต้องเรียนสกิลที่เกี่ยวข้องก่อน)",
                 Name, msg.RecipeId);
@@ -912,9 +915,17 @@ public partial class ServerPlayer
         if (!ValidateMaterials(slots, msg.Materials, out List<string> materialIds,
                 out Dictionary<string, List<string>> slotProtos, out string reason))
         {
-            Console.WriteLine("[craft] ปฏิเสธ {0} สูตร {1}: {2}", Name, msg.RecipeId, reason);
-            Send(Aborts.Reason(), header.Seq);
-            return;
+            if (InstantCraft)
+            {
+                materialIds = new List<string>();
+                slotProtos = new Dictionary<string, List<string>>();
+            }
+            else
+            {
+                Console.WriteLine("[craft] ปฏิเสธ {0} สูตร {1}: {2}", Name, msg.RecipeId, reason);
+                Send(Aborts.Reason(), header.Seq);
+                return;
+            }
         }
         // [4 ก.ย. 2026] 🐛 ลูปทำอาหาร — สูตรแปรรูป (Type 1) รับ "ของที่แปรรูปแล้ว" กลับเข้าไปได้
         //    เช่น roast_01 ขอแค่ tag `eatable` ส่วนเนื้อย่างก็ยังติด `eatable` ⇒ ย่างเนื้อย่างซ้ำได้ไม่จำกัด
@@ -948,14 +959,15 @@ public partial class ServerPlayer
         }
 
         // ต้องยืนที่โต๊ะ/เตาที่ถูกชนิด — นี่คือสิ่งที่ทำให้ "ทำอาหาร" ต่างจาก "คราฟต์เฉย ๆ"
-        if (!CheckWorkbench(meta, msg.Workbench, out string workbenchReason))
+        if (!InstantCraft && !CheckWorkbench(meta, msg.Workbench, out string workbenchReason))
         {
             Console.WriteLine("[craft] ปฏิเสธ {0} สูตร {1}: {2}", Name, msg.RecipeId, workbenchReason);
             Send(new Info { Text = workbenchReason }, header.Seq);
             Send(Aborts.Reason(), header.Seq);
             return;
         }
-        if (!CheckCraftTool(meta, msg.ToolItemId, out string usedToolId, out string missingTag))
+        string usedToolId = null;
+        if (!InstantCraft && !CheckCraftTool(meta, msg.ToolItemId, out usedToolId, out string missingTag))
         {
             Console.WriteLine("[craft] ปฏิเสธ {0} สูตร {1}: ต้องใช้ {2}", Name, msg.RecipeId, missingTag);
             SendToolNeeded(missingTag, header.Seq);
@@ -1013,8 +1025,8 @@ public partial class ServerPlayer
             return;
         }
         // เฟส C — สตามินาที่เสียเป็นค่าจริงของสูตร (ต้มน้ำซุปเหนื่อยกว่าฟั่นเชือก)
-        float staminaCost = meta != null && meta.Energy > 0f ? meta.Energy : StaminaCostCraft;
-        if (!TrySpendStamina(staminaCost, ActionKind.Craft))
+        float staminaCost = InstantCraft ? 0f : (meta != null && meta.Energy > 0f ? meta.Energy : StaminaCostCraft);
+        if (staminaCost > 0f && !TrySpendStamina(staminaCost, ActionKind.Craft))
         {
             Console.WriteLine("[survival] {0} สตามินาไม่พอสำหรับคราฟต์ (ต้องใช้ {1})", Name, staminaCost);
             Send(Aborts.Reason(), header.Seq);
@@ -1031,7 +1043,7 @@ public partial class ServerPlayer
             ? meta.Duration
             : (isCooking ? 1f
                : (craftCfg != null && craftCfg.EffortFormula ? craftCfg.CraftSeconds(resultLevel) : 2f));
-        float craftSeconds = baseSeconds * CraftDurationScale();
+        float craftSeconds = InstantCraft ? 0.05f : baseSeconds * CraftDurationScale();
         Send(new Messages.Timer { Duration = craftSeconds }, header.Seq);
 
         List<Item> crafted = meta != null && meta.Type == 1
@@ -1048,53 +1060,67 @@ public partial class ServerPlayer
         // [TodoList/06] สุ่มผลตอนเริ่ม (ค่าเดียวกับที่พรีวิวบอก) — ล้มเหลว/สำเร็จ/สำเร็จมาก
         (float successRate, float greatRate, _) = EstimateCraftOutcome(meta, resultLevel);
         Result outcome = Result.Success;
-        double roll = _craftRng.NextDouble();
-        if (roll >= successRate)
+        if (InstantCraft)
         {
-            outcome = Result.Failure;
+            successRate = 1f;
         }
-        else if (_craftRng.NextDouble() < greatRate)
+        else
         {
-            outcome = Result.GreatSuccess;
-            for (int i = 0; i < crafted.Count; i++) { crafted[i] = ApplyGreatSuccess(crafted[i]); }
+            double roll = _craftRng.NextDouble();
+            if (roll >= successRate)
+            {
+                outcome = Result.Failure;
+            }
+            else if (_craftRng.NextDouble() < greatRate)
+            {
+                outcome = Result.GreatSuccess;
+                for (int i = 0; i < crafted.Count; i++) { crafted[i] = ApplyGreatSuccess(crafted[i]); }
+            }
         }
         Shared.Skill.Category craftCategory = CraftCategoryOf(meta);
         int craftSkill = Math.Max(1, ProficiencyLevel(craftCategory));
 
         System.Action craftFinish = delegate
         {
-            // GP-08: หักวัตถุดิบแบบ "ครบทุกชิ้นหรือไม่ทำเลย" — ระหว่างที่รออยู่
-            // ผู้เล่นอาจเอาของไปใส่กล่อง/ให้คนอื่นไปแล้ว ถ้าหักไม่ครบก็ถือว่าคราฟต์ไม่สำเร็จ
+            if (!InstantCraft)
+            {
+                // GP-08: หักวัตถุดิบแบบ "ครบทุกชิ้นหรือไม่ทำเลย" — ระหว่างที่รออยู่
+                // ผู้เล่นอาจเอาของไปใส่กล่อง/ให้คนอื่นไปแล้ว ถ้าหักไม่ครบก็ถือว่าคราฟต์ไม่สำเร็จ
+                lock (_inventory)
+                {
+                    var indices = new List<int>(materialIds.Count);
+                    for (int i = 0; i < materialIds.Count; i++)
+                    {
+                        string id = materialIds[i];
+                        int idx = _inventory.FindIndex(it => it.Id == id);
+                        if (idx < 0 || indices.Contains(idx))
+                        {
+                            Console.WriteLine("[craft] {0}: วัตถุดิบ {1} หายไประหว่างคราฟต์ — ยกเลิก", Name, id);
+                            RestoreStamina(staminaCost, 0f);
+                            Send(Aborts.Reason(), header.Seq);
+                            return;
+                        }
+                        indices.Add(idx);
+                    }
+                    indices.Sort();
+                    // [TodoList/06] ล้มเหลว = ไม่ได้ของ · คืนวัสดุตาม FailureKeepRatio (หักเฉพาะส่วนที่เสีย)
+                    int removeCount = indices.Count;
+                    if (outcome == Result.Failure)
+                    {
+                        float keep = Math.Clamp(ServerConfig.Current.Crafting?.FailureKeepRatio ?? 0.5f, 0f, 1f);
+                        removeCount = (int)Math.Ceiling(indices.Count * (1f - keep));
+                    }
+                    int removed = 0;
+                    for (int i = indices.Count - 1; i >= 0 && removed < removeCount; i--, removed++)
+                    {
+                        ForgetInventoryItem(_inventory[indices[i]].Id);
+                        _inventory.RemoveAt(indices[i]);
+                    }
+                }
+            }
+
             lock (_inventory)
             {
-                var indices = new List<int>(materialIds.Count);
-                for (int i = 0; i < materialIds.Count; i++)
-                {
-                    string id = materialIds[i];
-                    int idx = _inventory.FindIndex(it => it.Id == id);
-                    if (idx < 0 || indices.Contains(idx))
-                    {
-                        Console.WriteLine("[craft] {0}: วัตถุดิบ {1} หายไประหว่างคราฟต์ — ยกเลิก", Name, id);
-                        RestoreStamina(staminaCost, 0f);
-                        Send(Aborts.Reason(), header.Seq);
-                        return;
-                    }
-                    indices.Add(idx);
-                }
-                indices.Sort();
-                // [TodoList/06] ล้มเหลว = ไม่ได้ของ · คืนวัสดุตาม FailureKeepRatio (หักเฉพาะส่วนที่เสีย)
-                int removeCount = indices.Count;
-                if (outcome == Result.Failure)
-                {
-                    float keep = Math.Clamp(ServerConfig.Current.Crafting?.FailureKeepRatio ?? 0.5f, 0f, 1f);
-                    removeCount = (int)Math.Ceiling(indices.Count * (1f - keep));
-                }
-                int removed = 0;
-                for (int i = indices.Count - 1; i >= 0 && removed < removeCount; i--, removed++)
-                {
-                    ForgetInventoryItem(_inventory[indices[i]].Id);
-                    _inventory.RemoveAt(indices[i]);
-                }
                 if (outcome != Result.Failure)
                 {
                     for (int i = 0; i < crafted.Count; i++)
@@ -1104,7 +1130,7 @@ public partial class ServerPlayer
                 }
             }
             // เครื่องมือสึกก็ต่อเมื่อคราฟต์สำเร็จจริง (กติกาเดียวกับการเก็บของ)
-            if (outcome != Result.Failure)
+            if (outcome != Result.Failure && usedToolId != null)
             {
                 WearTool(usedToolId, WearKind.Craft);
             }

@@ -132,10 +132,26 @@ public static class ActionData
     /// <summary>ท่าที่ใช้ได้ของอาวุธ tag นี้ (ไม่รู้จัก = มือเปล่า)</summary>
     public static string[] ForWeaponTag(string tag)
     {
-        if (!string.IsNullOrEmpty(tag) && WeaponActions.TryGetValue(tag, out string[] ids))
+        if (string.IsNullOrEmpty(tag))
+        {
+            return WeaponActions.TryGetValue("bare_hands", out string[] bare) ? bare : new string[0];
+        }
+        if (WeaponActions.TryGetValue(tag, out string[] ids))
         {
             return ids;
         }
-        return WeaponActions.TryGetValue("bare_hands", out string[] bare) ? bare : new string[0];
+        if (tag.Equals("onehand", StringComparison.OrdinalIgnoreCase) && WeaponActions.TryGetValue("sword_onehand", out string[] s1))
+        {
+            return s1;
+        }
+        if (tag.Equals("twohand", StringComparison.OrdinalIgnoreCase) && WeaponActions.TryGetValue("sword_twohand", out string[] s2))
+        {
+            return s2;
+        }
+        if ((tag.Equals("lance", StringComparison.OrdinalIgnoreCase) || tag.Equals("spear", StringComparison.OrdinalIgnoreCase)) && WeaponActions.TryGetValue("lance_twohand", out string[] l2))
+        {
+            return l2;
+        }
+        return WeaponActions.TryGetValue("bare_hands", out string[] fallbackBare) ? fallbackBare : new string[0];
     }
 }

@@ -382,6 +382,10 @@ public class TerrainStore
                 Console.WriteLine("[terrain] info.yml parse failed: " + e.Message);
             }
         }
+        if (string.IsNullOrWhiteSpace(Info.region_template))
+        {
+            Info.region_template = RegionTemplateData.Find(terrainId)?.Name ?? "ri35te171228";
+        }
         if (Info.tile_count == null || Info.tile_count.Length < 2)
         {
             Info.tile_count = new[] { 256, 256 };
